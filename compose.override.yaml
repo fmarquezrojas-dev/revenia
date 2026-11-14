@@ -1,0 +1,18 @@
+services:
+  worker:
+    extends:
+      file: compose.yaml
+      service: app
+    ports: !reset []
+    command: ["php", "artisan", "horizon"]
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+  scheduler:
+    extends:
+      file: compose.yaml
+      service: app
+    ports: !reset []
+    command: ["php", "artisan", "schedule:work"]
+    restart: unless-stopped
+    stop_grace_period: 60s

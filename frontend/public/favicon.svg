@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Revenia">
+  <rect width="32" height="32" rx="8" fill="#2454ce"/>
+  <path fill="#fff" d="M9 7h8c5 0 7 2 7 6 0 3-1.5 5-4 6l5 6h-6l-4-6h-1v6H9V7zm5 5v3h3c1.5 0 2-.5 2-1.5S18.5 12 17 12h-3z"/>
+</svg>

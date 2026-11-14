@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="vendor/autoload.php"
+    colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+
+    <php>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="SIMULATION_DEMO_CONTROLS" value="false" force="true"/>
+        <env name="MP_SANDBOX_ENABLED" value="false" force="true"/>
+        <env name="MP_TEST_ACCESS_TOKEN" value="" force="true"/>
+        <env name="MP_WEBHOOK_SECRET" value="" force="true"/>
+
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="DB_HOST" value="db" force="true"/>
+        <env name="DB_PORT" value="5432" force="true"/>
+        <env name="DB_DATABASE" value="facturly_testing" force="true"/>
+        <env name="DB_USERNAME" value="facturly_test" force="true"/>
+        <env name="DB_PASSWORD" value="facturly_test_local" force="true"/>
+
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="SANCTUM_STATEFUL_DOMAINS" value="localhost:5173,localhost:8000" force="true"/>
+    </php>
+</phpunit>

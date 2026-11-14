@@ -1,0 +1,14 @@
+.git
+**/node_modules
+**/vendor
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/storage/logs/*
+**/bootstrap/cache/*.php
+docs/testing/evidence
+docs/rename/evidence
+.tmp-testing-tools/
+.portfolio-work/
+docs/capturas

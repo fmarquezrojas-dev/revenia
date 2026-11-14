@@ -1,0 +1,83 @@
+name: Revenia verification
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_DB: facturly_testing
+          POSTGRES_USER: facturly_test
+          POSTGRES_PASSWORD: facturly_test_local
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U facturly_test -d facturly_testing"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_DATABASE: facturly_testing
+      DB_USERNAME: facturly_test
+      DB_PASSWORD: facturly_test_local
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, bcmath, intl, mbstring, redis, pcntl, zip
+          coverage: none
+      - run: echo '127.0.0.1 db' | sudo tee -a /etc/hosts
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer audit
+      - run: vendor/bin/pint --test
+      - run: vendor/bin/phpunit --log-junit ../backend-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-results
+          path: backend-results.xml
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm audit
+      - run: npm run lint
+      - run: npm test -- --maxWorkers=2
+      - run: npm run build
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+      - run: node scripts/run-integral-e2e.cjs
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integral-evidence
+          path: docs/testing/evidence/

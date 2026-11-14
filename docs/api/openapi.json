@@ -1,0 +1,3727 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Facturly - Catalogos, Borradores y Emision simulada",
+    "version": "1.7.0",
+    "description": "Catalogos y comprobantes 01/03 con importes enteros, numeracion transaccional, idempotencia, outbox y proveedor simulado. Sin conexion SUNAT ni validez tributaria. Sanctum por sesion; CSRF en escrituras. Owner/issuer emiten y reintentan; accountant consulta. PDF privado y correo de comprobantes accepted, con estados independientes y destino controlado de demostracion. Cobranza Checkout Pro de pruebas, deshabilitada sin configuracion; ver docs/api/cobranza.md. Planes, periodos y cuotas de emision; pagos unicos de suscripcion separados de cobranza."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000"
+    }
+  ],
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/v1/products": {
+      "get": {
+        "summary": "Listar por empresa, orden description e id",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Product"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "current_page",
+                        "last_page",
+                        "per_page",
+                        "total"
+                      ],
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso sobre recurso propio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PEN",
+                "USD"
+              ]
+            }
+          },
+          {
+            "name": "tax_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "10",
+                "20",
+                "30"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 15
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Crear activo",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Product"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso sobre recurso propio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar detalle propio",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Product"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso sobre recurso propio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Editar o cambiar estado",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Product"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso sobre recurso propio",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/series": {
+      "get": {
+        "summary": "Listar series con orden doc_type, code, id",
+        "description": "Solo owner. Empresa de sesion; company_id rechazado. Campos desconocidos se ignoran sin persistirse.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "links",
+                    "meta"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocumentSeries"
+                      }
+                    },
+                    "links": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": [
+                        "current_page",
+                        "last_page",
+                        "per_page",
+                        "total"
+                      ],
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo owner en recursos propios",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o ajeno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "doc_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "01",
+                "03",
+                "07"
+              ]
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "enum": [
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 15
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Crear serie activa con contador cero",
+        "description": "Solo owner. Empresa de sesion; company_id rechazado. Campos desconocidos se ignoran sin persistirse.",
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DocumentSeries"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo owner en recursos propios",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o ajeno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSeries"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/series/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar serie propia",
+        "description": "Solo owner. Empresa de sesion; company_id rechazado. Campos desconocidos se ignoran sin persistirse.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DocumentSeries"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo owner en recursos propios",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o ajeno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Activar o desactivar sin cambiar numeracion",
+        "description": "Solo owner. Empresa de sesion; company_id rechazado. Campos desconocidos se ignoran sin persistirse.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DocumentSeries"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Solo owner en recursos propios",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso inexistente o ajeno",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "419": {
+            "description": "CSRF vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validacion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSeries"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents": {
+      "get": {
+        "summary": "Listar comprobantes propios (tres roles)",
+        "parameters": [
+          {
+            "name": "doc_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "01",
+                "03"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "issued",
+                "queued",
+                "sending",
+                "accepted",
+                "rejected",
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "customer_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 15
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DraftDocument"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "current_page": {
+                          "type": "integer"
+                        },
+                        "last_page": {
+                          "type": "integer"
+                        },
+                        "per_page": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Version obsoleta o estado no draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentConflict"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear borrador (owner/issuer)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DraftDocument"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Version obsoleta o estado no draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar comprobante propio",
+        "responses": {
+          "200": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DraftDocument"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Version obsoleta o estado no draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentConflict"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Reemplazar contenido del borrador con version esperada",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DraftDocument"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Version obsoleta o estado no draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentConflict"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Eliminar borrador propio con version esperada",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483646
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Borrador y sus lineas eliminados"
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Version obsoleta o estado no draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/preview": {
+      "post": {
+        "summary": "Calcular sin escribir ni numerar (owner/issuer)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftPreviewInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DraftItem"
+                          }
+                        },
+                        "totals": {
+                          "$ref": "#/components/schemas/DocumentTotals"
+                        },
+                        "version": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "number": {
+                          "type": "null"
+                        },
+                        "status": {
+                          "const": "draft"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Version obsoleta o estado no draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/document-series-options": {
+      "get": {
+        "summary": "Selector de series activas propias, owner/issuer; no concede administracion",
+        "parameters": [
+          {
+            "name": "doc_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "01",
+                "03"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocumentSeriesOption"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/issue": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Registrar emision simulada",
+        "description": "202 registra la solicitud, no aceptacion tributaria. Replay exacto por empresa/operacion/clave y huella [operacion,documento,version]. Mantiene numero e identidad del proveedor en retry.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483646
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Solicitud registrada o reproducida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmissionRegistered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion o cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Documento fuera de la empresa o inexistente"
+          },
+          "409": {
+            "description": "Clave reutilizada, version obsoleta o transicion no permitida"
+          },
+          "422": {
+            "description": "Payload o Idempotency-Key invalido"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/retry": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Reintentar fallo tecnico recuperable",
+        "description": "202 registra la solicitud, no aceptacion tributaria. Replay exacto por empresa/operacion/clave y huella [operacion,documento,version]. Mantiene numero e identidad del proveedor en retry.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483646
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Solicitud registrada o reproducida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmissionRegistered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion o cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Documento fuera de la empresa o inexistente"
+          },
+          "409": {
+            "description": "Clave reutilizada, version obsoleta o transicion no permitida"
+          },
+          "422": {
+            "description": "Payload o Idempotency-Key invalido"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/events": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar los ultimos 100 eventos del comprobante propio",
+        "responses": {
+          "200": {
+            "description": "Eventos mas recientes primero, sin payloads personales",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EmissionEvent"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion o cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Documento fuera de la empresa o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/pdf": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Descargar PDF privado de un documento accepted",
+        "description": "Owner, issuer, accountant. No rutas publicas ni datos del archivo en URL. Cache-Control private, no-store. 409 pdf_pending/pdf_failed; 404 pdf_missing.",
+        "responses": {
+          "200": {
+            "description": "PDF privado verificado",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion o cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Documento ajeno/inexistente o pdf_missing"
+          },
+          "409": {
+            "description": "Estado incompatible, PDF pendiente/fallido, version o clave en conflicto"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/pdf/regenerate": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Regenerar PDF (solo owner)",
+        "description": "Intencion durable, separada de emision. Replay por empresa/operacion/clave. Correo exige PDF listo, no acepta destinatario libre; una entrega pendiente, 60s de espera y maximo 3 en 24h. Unknown requiere revision sin reintento automatico.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483646
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Intencion registrada o replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending"
+                          ]
+                        },
+                        "version": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion o cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Documento ajeno/inexistente o pdf_missing"
+          },
+          "409": {
+            "description": "Estado incompatible, PDF pendiente/fallido, version o clave en conflicto"
+          },
+          "422": {
+            "description": "Payload invalido o destinatario no disponible"
+          },
+          "429": {
+            "description": "Limite de nuevas solicitudes de correo"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/email": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Solicitar correo (owner/issuer)",
+        "description": "Intencion durable, separada de emision. Replay por empresa/operacion/clave. Correo exige PDF listo, no acepta destinatario libre; una entrega pendiente, 60s de espera y maximo 3 en 24h. Unknown requiere revision sin reintento automatico.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 100,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "file_id"
+                ],
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Intencion registrada o replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion o cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Documento ajeno/inexistente o pdf_missing"
+          },
+          "409": {
+            "description": "Estado incompatible, PDF pendiente/fallido, version o clave en conflicto"
+          },
+          "422": {
+            "description": "Payload invalido o destinatario no disponible"
+          },
+          "429": {
+            "description": "Limite de nuevas solicitudes de correo"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/collections": {
+      "get": {
+        "summary": "Consultar saldo e historial de cobranza",
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de cobranza",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CollectionSummary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesion o cuenta inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Documento ajeno o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/payment-link": {
+      "post": {
+        "summary": "Solicitar checkout por saldo completo: owner e issuer",
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{16,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Intencion durable registrada"
+          },
+          "401": {
+            "description": "Sesion o cuenta inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Documento ajeno o inexistente"
+          },
+          "409": {
+            "description": "Conflicto de saldo, estado o idempotencia"
+          },
+          "422": {
+            "description": "Payload, clave o moneda no admitidos"
+          },
+          "429": {
+            "description": "Conciliacion reciente"
+          },
+          "503": {
+            "description": "Pagos de prueba deshabilitados"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/payments/reconcile": {
+      "post": {
+        "summary": "Conciliacion manual: owner",
+        "parameters": [
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{16,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Intencion durable registrada"
+          },
+          "401": {
+            "description": "Sesion o cuenta inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Documento ajeno o inexistente"
+          },
+          "409": {
+            "description": "Conflicto de saldo, estado o idempotencia"
+          },
+          "422": {
+            "description": "Payload, clave o moneda no admitidos"
+          },
+          "429": {
+            "description": "Conciliacion reciente"
+          },
+          "503": {
+            "description": "Pagos de prueba deshabilitados"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/mercadopago": {
+      "post": {
+        "summary": "Notificacion de pago de pruebas; HMAC y consulta autoritativa posterior",
+        "security": [],
+        "parameters": [
+          {
+            "name": "data.id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "action",
+                  "data",
+                  "live_mode"
+                ],
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "integer"
+                    ]
+                  },
+                  "type": {
+                    "const": "payment"
+                  },
+                  "action": {
+                    "enum": [
+                      "payment.created",
+                      "payment.updated"
+                    ]
+                  },
+                  "live_mode": {
+                    "const": false
+                  },
+                  "data": {
+                    "type": "object",
+                    "required": [
+                      "id"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": [
+                          "string",
+                          "integer"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persistido antes de responder"
+          },
+          "400": {
+            "description": "Payload o query ambiguo"
+          },
+          "401": {
+            "description": "Firma invalida"
+          },
+          "413": {
+            "description": "Cuerpo demasiado grande"
+          },
+          "415": {
+            "description": "Se requiere JSON"
+          },
+          "422": {
+            "description": "Evento o modo no admitido"
+          },
+          "503": {
+            "description": "Integracion deshabilitada"
+          }
+        }
+      }
+    },
+    "/api/v1/plans": {
+      "get": {
+        "summary": "Catalogo de demostracion: owner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Datos persistidos del servidor"
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/usage": {
+      "get": {
+        "summary": "Disponibilidad operativa de la empresa activa",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Datos persistidos del servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Usage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/subscription": {
+      "get": {
+        "summary": "Plan e historial financiero: owner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Datos persistidos del servidor"
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/history": {
+      "get": {
+        "summary": "Historial de los ultimos 50 contratos: owner",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Datos persistidos del servidor"
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/{subscriptionId}": {
+      "get": {
+        "summary": "Contratacion propia: owner",
+        "parameters": [
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos persistidos del servidor"
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions": {
+      "post": {
+        "summary": "Contratar/renovar mediante pago unico sandbox: owner",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{16,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Datos persistidos del servidor"
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          },
+          "409": {
+            "description": "Conflicto de idempotencia, contratacion pendiente, revision o periodo futuro"
+          },
+          "422": {
+            "description": "Plan/payload/clave no validos"
+          },
+          "503": {
+            "description": "Integracion sandbox sin configurar"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "plan_code"
+                ],
+                "properties": {
+                  "plan_code": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/subscriptions/{subscriptionId}/cancel": {
+      "post": {
+        "summary": "Cancelar intencion local pendiente: owner",
+        "parameters": [
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{16,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datos persistidos del servidor"
+          },
+          "401": {
+            "description": "Sesion/cuenta/empresa inactiva"
+          },
+          "403": {
+            "description": "Permiso insuficiente"
+          },
+          "404": {
+            "description": "Recurso ajeno o inexistente"
+          },
+          "409": {
+            "description": "Conflicto de idempotencia, contratacion pendiente, revision o periodo futuro"
+          },
+          "422": {
+            "description": "Plan/payload/clave no validos"
+          },
+          "503": {
+            "description": "Integracion sandbox sin configurar"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "summary": "Resumen de negocio y detalle reconciliable por empresa",
+        "description": "Actividad por primera aceptacion y confirmacion de pago; cartera actual sin filtro de fechas. Importes como cadenas enteras de centimos. Notas de credito no habilitadas. Ver docs/DASHBOARD.md.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PEN",
+                "USD"
+              ],
+              "default": "PEN"
+            }
+          },
+          {
+            "name": "group_by",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day"
+              ]
+            }
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "accepted",
+                "rejected",
+                "payments",
+                "outstanding",
+                "excess",
+                "review",
+                "queued",
+                "failed",
+                "pdf_failed",
+                "email_failed"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data: currency, period, timezone, calculated_at y activity/portfolio/series/alerts/recent/usage/actions o detail paginado cuando se especifica metric"
+          },
+          "401": {
+            "description": "Sesion o cuenta inactiva"
+          },
+          "403": {
+            "description": "Consulta no autorizada"
+          },
+          "422": {
+            "description": "Filtros no validos, company_id o campo desconocido"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "laravel_session",
+        "description": "Nombre real configurable por SESSION_COOKIE. GET /sanctum/csrf-cookie antes de escribir; enviar X-XSRF-TOKEN."
+      }
+    },
+    "schemas": {
+      "ProductCreate": {
+        "type": "object",
+        "required": [
+          "code",
+          "description",
+          "unit_code",
+          "currency",
+          "unit_price_cents",
+          "tax_type"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "description": "Trim exterior y mayusculas; unico por empresa."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "unit_code": {
+            "type": "string",
+            "enum": [
+              "NIU",
+              "ZZ"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Precio unitario sin IGV, entero JSON; no strings ni fracciones."
+          },
+          "tax_type": {
+            "type": "string",
+            "enum": [
+              "10",
+              "20",
+              "30"
+            ]
+          },
+          "company_id": false,
+          "id": false,
+          "created_at": false,
+          "updated_at": false,
+          "is_active": false
+        }
+      },
+      "ProductUpdate": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "description": "Trim exterior y mayusculas; unico por empresa."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "unit_code": {
+            "type": "string",
+            "enum": [
+              "NIU",
+              "ZZ"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Precio unitario sin IGV, entero JSON; no strings ni fracciones."
+          },
+          "tax_type": {
+            "type": "string",
+            "enum": [
+              "10",
+              "20",
+              "30"
+            ]
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "company_id": false,
+          "id": false,
+          "created_at": false,
+          "updated_at": false
+        }
+      },
+      "Product": {
+        "type": "object",
+        "required": [
+          "code",
+          "description",
+          "unit_code",
+          "currency",
+          "unit_price_cents",
+          "tax_type",
+          "id",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "description": "Trim exterior y mayusculas; unico por empresa."
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 250
+          },
+          "unit_code": {
+            "type": "string",
+            "enum": [
+              "NIU",
+              "ZZ"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Precio unitario sin IGV, entero JSON; no strings ni fracciones."
+          },
+          "tax_type": {
+            "type": "string",
+            "enum": [
+              "10",
+              "20",
+              "30"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "DocumentSeries": {
+        "type": "object",
+        "required": [
+          "id",
+          "doc_type",
+          "code",
+          "current_number",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03",
+              "07"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[FB][A-Z0-9]{3}$",
+            "minLength": 4,
+            "maxLength": 4
+          },
+          "current_number": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 99999999
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateSeries": {
+        "type": "object",
+        "required": [
+          "doc_type",
+          "code"
+        ],
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03",
+              "07"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "Trim exterior y mayusculas ASCII; codigo normalizado de cuatro caracteres. 01: F..., 03: B..., 07: F... o B...."
+          },
+          "id": false,
+          "company_id": false,
+          "current_number": false,
+          "is_active": false,
+          "created_at": false,
+          "updated_at": false
+        }
+      },
+      "UpdateSeries": {
+        "type": "object",
+        "required": [
+          "is_active"
+        ],
+        "properties": {
+          "is_active": {
+            "type": "boolean"
+          },
+          "id": false,
+          "company_id": false,
+          "current_number": false,
+          "doc_type": false,
+          "code": false,
+          "created_at": false,
+          "updated_at": false
+        }
+      },
+      "DocumentTotals": {
+        "type": "object",
+        "required": [
+          "taxable_cents",
+          "exempt_cents",
+          "unaffected_cents",
+          "igv_cents",
+          "total_cents"
+        ],
+        "properties": {
+          "taxable_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "exempt_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unaffected_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "igv_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "DraftItemInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "product_id",
+          "quantity"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^[0-9]{1,7}(\\.[0-9]{1,3})?$",
+            "description": "Decimal positivo de 0.001 a 1000000.000; respuesta normalizada a tres decimales."
+          }
+        },
+        "description": "id solo en edicion; debe pertenecer al borrador. Sin precios ni snapshots del navegador."
+      },
+      "DraftCreate": {
+        "type": "object",
+        "required": [
+          "doc_type",
+          "currency",
+          "customer_id",
+          "series_id",
+          "issue_date",
+          "items"
+        ],
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "series_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date",
+            "description": "No futura segun America/Lima."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/DraftItemInput"
+            },
+            "description": "Un producto por documento; IDs y productos sin duplicados."
+          }
+        },
+        "description": "Alta completa. Los items no pueden enviar id. Campos del servidor rechazados incluso si son null. No se aceptan totales, estado, empresa, creador o numeracion."
+      },
+      "DraftUpdate": {
+        "type": "object",
+        "required": [
+          "doc_type",
+          "currency",
+          "customer_id",
+          "series_id",
+          "issue_date",
+          "items",
+          "version"
+        ],
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "series_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date",
+            "description": "No futura segun America/Lima."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/DraftItemInput"
+            },
+            "description": "Un producto por documento; IDs y productos sin duplicados."
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483646
+          }
+        },
+        "description": "PATCH envia la cabecera y lista completas. Items omitidos se eliminan; IDs presentes conservan identidad. Mismo producto conserva snapshot; reemplazo toma catalogo actual."
+      },
+      "DraftPreviewInput": {
+        "type": "object",
+        "required": [
+          "doc_type",
+          "currency",
+          "customer_id",
+          "series_id",
+          "issue_date",
+          "items"
+        ],
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "series_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date",
+            "description": "No futura segun America/Lima."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/DraftItemInput"
+            },
+            "description": "Un producto por documento; IDs y productos sin duplicados."
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483646
+          }
+        },
+        "description": "Alta sin document_id/version/ids de item. Edicion requiere document_id y version e IDs de las lineas existentes. Mismas reglas que guardado; cero escrituras."
+      },
+      "DraftItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "line_number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "description": {
+            "type": "string"
+          },
+          "unit_code": {
+            "type": "string",
+            "enum": [
+              "NIU",
+              "ZZ"
+            ]
+          },
+          "unit_price_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "tax_type": {
+            "type": "string",
+            "enum": [
+              "10",
+              "20",
+              "30"
+            ]
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^[0-9]{1,7}(\\.[0-9]{1,3})?$",
+            "description": "Decimal positivo de 0.001 a 1000000.000; respuesta normalizada a tres decimales."
+          },
+          "base_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "igv_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "product_is_active": {
+            "type": "boolean"
+          },
+          "product_currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ],
+            "description": "Moneda del snapshot del documento, distinta de product_currency actual si cambio el catalogo."
+          }
+        }
+      },
+      "DocumentSeriesOption": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "doc_type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03"
+            ]
+          }
+        }
+      },
+      "DraftDocument": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "number",
+          "version",
+          "items",
+          "totals",
+          "customer",
+          "series"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "01",
+              "03"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "series_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date",
+            "description": "No futura segun America/Lima."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "issued",
+              "queued",
+              "sending",
+              "accepted",
+              "rejected",
+              "failed"
+            ]
+          },
+          "number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "issued_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DocumentTotals"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftItem"
+            }
+          },
+          "customer": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "doc_type": {
+                "type": "string"
+              },
+              "doc_number": {
+                "type": "string"
+              },
+              "is_active": {
+                "type": "boolean"
+              }
+            }
+          },
+          "series": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DocumentSeriesOption"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "is_active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            ]
+          },
+          "formatted_number": {
+            "type": "string",
+            "nullable": true
+          },
+          "issuer": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "ruc": {
+                "type": "string",
+                "nullable": true
+              },
+              "legal_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "trade_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "address": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          },
+          "can_retry": {
+            "type": "boolean"
+          },
+          "next_attempt_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "result_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "result_message": {
+            "type": "string",
+            "nullable": true
+          },
+          "failure_kind": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "recoverable",
+              "unknown",
+              "permanent",
+              null
+            ]
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DocumentDelivery"
+          }
+        }
+      },
+      "DocumentConflict": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "document_version_conflict",
+              "document_not_draft"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "EmissionRegistered": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": [
+              "id",
+              "number",
+              "formatted_number",
+              "status",
+              "version",
+              "status_url"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "number": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 99999999
+              },
+              "formatted_number": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued"
+                ]
+              },
+              "version": {
+                "type": "integer"
+              },
+              "status_url": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "EmissionEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string"
+          },
+          "from_status": {
+            "type": "string"
+          },
+          "to_status": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "attempt_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DocumentDelivery": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "pdf": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "generating",
+                  "ready",
+                  "failed"
+                ]
+              },
+              "version": {
+                "type": "integer"
+              },
+              "available": {
+                "type": "boolean"
+              },
+              "file_id": {
+                "type": "string",
+                "format": "uuid",
+                "nullable": true
+              },
+              "generated_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "next_attempt_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "error_code": {
+                "type": "string",
+                "nullable": true
+              },
+              "can_regenerate": {
+                "type": "boolean"
+              }
+            }
+          },
+          "email": {
+            "type": "object",
+            "properties": {
+              "recipient": {
+                "type": "string",
+                "nullable": true,
+                "description": "Solo owner/issuer; historico o destino de pruebas controlado"
+              },
+              "can_send": {
+                "type": "boolean"
+              },
+              "deliveries": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "sending",
+                        "sent",
+                        "failed",
+                        "unknown"
+                      ]
+                    },
+                    "recipient": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "message_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error_code": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "sent_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "CollectionSummary": {
+        "type": "object",
+        "required": [
+          "original_cents",
+          "credits_cents",
+          "reserved_cents",
+          "net_cents",
+          "outstanding_cents",
+          "paid_cents",
+          "excess_cents",
+          "needs_review",
+          "credit_notes_supported",
+          "enabled",
+          "can_create",
+          "can_reconcile",
+          "pending",
+          "status",
+          "currency",
+          "blocked_reason",
+          "orders",
+          "payments"
+        ],
+        "properties": {
+          "original_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "credits_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "reserved_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "net_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "outstanding_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "paid_cents": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              }
+            ]
+          },
+          "excess_cents": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              }
+            ]
+          },
+          "needs_review": {
+            "type": "boolean"
+          },
+          "credit_notes_supported": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "can_create": {
+            "type": "boolean"
+          },
+          "can_reconcile": {
+            "type": "boolean"
+          },
+          "pending": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "unpaid",
+              "partial",
+              "paid",
+              "review"
+            ]
+          },
+          "currency": {
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentOrder"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CollectedPayment"
+            }
+          }
+        }
+      },
+      "PaymentOrder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "const": "PEN"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "creating",
+              "open",
+              "unknown",
+              "closed",
+              "expired",
+              "stale",
+              "failed"
+            ]
+          },
+          "checkout_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_reconciled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "CollectedPayment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string"
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "applied_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "refunded_cents": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "needs_review": {
+            "type": "boolean"
+          },
+          "review_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "active",
+              "absent",
+              "expired",
+              "exhausted",
+              "review"
+            ]
+          },
+          "period_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "plan_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "consumed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "can_issue": {
+            "type": "boolean"
+          },
+          "expiring_soon": {
+            "type": "boolean"
+          },
+          "timezone": {
+            "const": "America/Lima"
+          },
+          "rule": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,95 @@
+# Only dedicated test services. No bind mounts, shared databases or production credentials.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: deploy/docker/e2e.Dockerfile
+    environment: &test-environment
+      APP_NAME: Revenia
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_KEY: "base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      APP_URL: http://localhost:5174
+      PHP_CLI_SERVER_WORKERS: "4"
+      E2E_ISOLATED: "1"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: facturly_series_testing_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      DB_USERNAME: facturly_test
+      DB_PASSWORD: e2e_synthetic_only
+      REDIS_HOST: redis
+      REDIS_CLIENT: phpredis
+      REDIS_PREFIX: facturly_e2e_
+      CACHE_STORE: redis
+      SESSION_DRIVER: database
+      SESSION_COOKIE: facturly_e2e_session
+      SESSION_SECURE_COOKIE: "false"
+      SANCTUM_STATEFUL_DOMAINS: localhost:5174,localhost:8001
+      QUEUE_CONNECTION: redis
+      EMISSION_QUEUE_CONNECTION: redis
+      DELIVERY_QUEUE_CONNECTION: redis
+      PAYMENT_QUEUE_CONNECTION: redis
+      SIMULATION_DEMO_CONTROLS: "true"
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_FROM_ADDRESS: demo@facturly.test
+      MAIL_FROM_NAME: Revenia
+      BCRYPT_ROUNDS: "4"
+      MP_SANDBOX_ENABLED: "true"
+      MP_TEST_ACCESS_TOKEN: synthetic-e2e-token-not-real
+      MP_TEST_COLLECTOR_ID: "123"
+      MP_WEBHOOK_SECRET: synthetic-e2e-secret-not-real
+      MP_WEBHOOK_URL: https://e2e.example.test/api/v1/webhooks/mercadopago
+      MP_RETURN_ORIGIN: https://e2e.example.test
+    volumes:
+      - e2e_storage:/app/storage
+    ports: ["127.0.0.1:8001:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      mailpit: {condition: service_started}
+  worker:
+    build: {context: ., dockerfile: deploy/docker/e2e.Dockerfile}
+    environment: *test-environment
+    volumes: ["e2e_storage:/app/storage"]
+    command: ["php", "artisan", "queue:work", "redis", "--queue=default,emissions,documents,payments", "--tries=1", "--timeout=60"]
+    depends_on: [app]
+  scheduler:
+    build: {context: ., dockerfile: deploy/docker/e2e.Dockerfile}
+    environment: *test-environment
+    volumes: ["e2e_storage:/app/storage"]
+    command: ["php", "artisan", "schedule:work"]
+    depends_on: [app]
+  frontend:
+    build: {context: ., dockerfile: deploy/docker/e2e-frontend.Dockerfile}
+    environment:
+      FACTURLY_API_TARGET: http://app:8000
+    ports: ["127.0.0.1:5174:5174"]
+    depends_on: [app]
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: facturly_series_testing_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      POSTGRES_USER: facturly_test
+      POSTGRES_PASSWORD: e2e_synthetic_only
+    tmpfs: ["/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facturly_test -d facturly_series_testing_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["127.0.0.1:8026:8025"]
+volumes:
+  e2e_storage:
