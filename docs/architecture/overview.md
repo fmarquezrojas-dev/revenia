@@ -59,7 +59,7 @@ sequenceDiagram
     Tick->>R: Publicar trabajo
     R->>W: Entregar trabajo
     W->>DB: Reclamar intento con lease y token
-    W->>S: Consultar identidad; enviar si no existe
+    W->>S: Consultar identidad y enviar si no existe
     S-->>W: Resultado persistido del simulador
     W->>DB: Finalizar solo si el intento sigue vigente
     W->>DB: Programar PDF si fue aceptado
