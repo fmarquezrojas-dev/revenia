@@ -81,3 +81,33 @@ jobs:
         with:
           name: integral-evidence
           path: docs/testing/evidence/
+
+  clean-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: revenia-install-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar desde una copia nueva
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e backend/.env
+          test -z "$(docker volume ls -q --filter label=com.docker.compose.project=$COMPOSE_PROJECT_NAME)"
+          cp backend/.env.example backend/.env
+          docker compose build
+          docker compose up -d --wait db redis mailpit
+          docker compose run --rm --no-deps -e COMPOSER_PROCESS_TIMEOUT=1200 app composer install --no-interaction --prefer-dist
+          docker compose run --rm --no-deps app php artisan key:generate
+          docker compose run --rm --no-deps frontend npm ci --ignore-scripts
+          test "$(docker compose exec -T db psql -U facturly -d facturly -Atqc "select current_database() || '/' || current_user || '/' || (select count(*) from pg_tables where schemaname='public')")" = facturly/facturly/0
+          docker compose run --rm --no-deps app php artisan migrate --force
+          docker compose up -d
+          docker compose exec -T app php artisan migrate:status
+          test "$(docker compose exec -T db psql -U facturly -d facturly -Atqc 'select count(*) from migrations')" -eq "$(find backend/database/migrations -name '*.php' | wc -l)"
+          docker compose exec -T app php scripts/prepare-demo.php
+          python3 scripts/verify-demo-install.py
+      - name: Retirar la instalación del runner
+        if: always()
+        run: docker compose down --volumes
