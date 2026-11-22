@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Documents\CreditNotes;
 use App\Actions\Issuance\ProcessEmission;
 use App\Actions\Issuance\RequestIssuance;
 use App\Actions\Payments\Collections;
@@ -9,13 +10,16 @@ use App\Actions\Payments\PaymentWork;
 use App\Contracts\PaymentGateway;
 use App\Models\Customer;
 use App\Models\Document;
+use App\Models\DocumentSeries;
 use App\Models\User;
+use App\Services\PaymentReceiver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\TestWith;
 use Tests\DatabaseTestCase;
+use Tests\Support\MerchantAccount;
 
 class CollectionsTest extends DatabaseTestCase
 {
@@ -29,6 +33,11 @@ class CollectionsTest extends DatabaseTestCase
         config(['payments.enabled' => true, 'payments.access_token' => 'synthetic-test-token-not-real', 'payments.collector_id' => '123', 'payments.webhook_secret' => 'synthetic-webhook-secret', 'payments.notification_url' => 'https://demo.example.test/api/v1/webhooks/mercadopago', 'payments.return_origin' => 'https://demo.example.test']);
         $this->gateway = new class implements PaymentGateway
         {
+            public function forReceiver(PaymentReceiver $receiver): PaymentGateway
+            {
+                return $this;
+            }
+
             public int $creates = 0;
 
             public bool $timeout = false;
@@ -72,6 +81,7 @@ class CollectionsTest extends DatabaseTestCase
         $d->items()->first()->update(['unit_price_cents' => 1000]);
         app(RequestIssuance::class)->handle($u, $d->id, 1, (string) Str::uuid());
         app(ProcessEmission::class)->handle($u->company_id, $d->id, 2);
+        MerchantAccount::create($u->company_id);
         $u->update(['role' => $role]);
         $this->actingAs($u->fresh(), 'web');
 
@@ -94,7 +104,7 @@ class CollectionsTest extends DatabaseTestCase
 
     private function apply(object $o, string $id = '500', string $status = 'approved', string $date = '2026-11-13T10:00:00Z', array $extra = []): void
     {
-        $this->gateway->response = array_replace(['id' => $id, 'collector_id' => '123', 'external_reference' => $o->id, 'preference_id' => '123-test', 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => sprintf('%d.%02d', intdiv($o->amount_cents, 100), $o->amount_cents % 100), 'transaction_amount_refunded' => '0', 'status' => $status, 'date_last_updated' => $date], $extra);
+        $this->gateway->response = array_replace(['id' => $id, 'collector_id' => $o->collector_id, 'external_reference' => $o->id, 'preference_id' => '123-test', 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => sprintf('%d.%02d', intdiv($o->amount_cents, 100), $o->amount_cents % 100), 'transaction_amount_refunded' => '0', 'status' => $status, 'date_last_updated' => $date], $extra);
         Collections::enqueue('payment', $o->company_id, $o->id, $id, (string) Str::uuid());
         $w = DB::table('payment_work')->where('kind', 'payment')->where('status', 'pending')->first();
         app(PaymentWork::class)->run($w->id);
@@ -132,6 +142,34 @@ class CollectionsTest extends DatabaseTestCase
         $this->actingAs(User::factory()->create(['role' => 'owner']), 'web');
         $this->order($d)->assertNotFound();
         $this->getJson('/api/v1/documents/'.$d->id.'/collections')->assertNotFound();
+    }
+
+    public function test_disabling_a_merchant_blocks_new_links_but_preserves_a_late_payment(): void
+    {
+        [$owner, $doc] = $this->fixture();
+        $order = $this->open($doc);
+        $this->deleteJson('/api/v1/merchant-connection')->assertOk()->assertJsonPath('data.status', 'disabled');
+        $this->order($doc)->assertConflict()->assertJsonPath('code', 'merchant_connection_required');
+        $this->getJson('/api/v1/documents/'.$doc->id.'/collections')->assertJsonPath('data.orders.0.checkout_url', null);
+        $this->apply($order);
+        $this->assertSame($doc->total_cents, app(Collections::class)->balance($doc)['paid_cents']);
+        $this->assertDatabaseHas('payment_audit', ['event' => 'connection_disabled', 'actor_id' => $owner->id, 'connection_id' => $order->connection_id]);
+    }
+
+    public function test_changing_receiver_keeps_the_original_order_bound_to_the_verified_merchant(): void
+    {
+        [, $doc] = $this->fixture();
+        $order = $this->open($doc);
+        Http::fake(['https://api.mercadolibre.com/users/me' => Http::response(['id' => 789, 'site_id' => 'MPE', 'tags' => ['test_user']])]);
+        $this->putJson('/api/v1/merchant-connection', ['access_token' => 'replacement-test-token', 'webhook_secret' => 'replacement-test-secret'])
+            ->assertOk()->assertJsonPath('data.collector_id', '789')->assertJsonMissingPath('data.access_token')->assertJsonMissingPath('data.webhook_secret');
+        $row = DB::table('merchant_connections')->where('collector_id', '789')->firstOrFail();
+        $this->assertNotSame('replacement-test-token', $row->access_token);
+        $this->assertNotSame('replacement-test-secret', $row->webhook_secret);
+        $this->assertDatabaseHas('payment_orders', ['id' => $order->id, 'collector_id' => '456', 'connection_id' => $order->connection_id]);
+        $this->apply($order, extra: ['collector_id' => '789']);
+        $this->assertDatabaseCount('payments', 0);
+        $this->getJson('/api/v1/receivables?operations=review')->assertOk()->assertJsonPath('data.rows.0.id', $doc->id);
     }
 
     public function test_one_payment_applies_once_and_stale_pending_cannot_regress(): void
@@ -209,15 +247,15 @@ class CollectionsTest extends DatabaseTestCase
         [, $d] = $this->fixture();
         $o = $this->open($d);
         $ts = '1700000000';
-        $signature = hash_hmac('sha256', 'id:500;request-id:request-1;ts:'.$ts.';', config('payments.webhook_secret'));
+        $signature = hash_hmac('sha256', 'id:500;request-id:request-1;ts:'.$ts.';', MerchantAccount::SECRET);
         $headers = ['x-request-id' => 'request-1', 'x-signature' => 'ts='.$ts.',v1='.$signature];
-        $body = ['id' => 'event-1', 'type' => 'payment', 'action' => 'payment.updated', 'live_mode' => false, 'data' => ['id' => '500'], 'status' => 'approved'];
+        $body = ['id' => 'event-1', 'user_id' => $o->collector_id, 'type' => 'payment', 'action' => 'payment.updated', 'live_mode' => false, 'data' => ['id' => '500'], 'status' => 'approved'];
         for ($i = 0; $i < 10; $i++) {
-            $this->postJson('/api/v1/webhooks/mercadopago?data.id=500', $body, $headers)->assertOk();
+            $this->postJson('/api/v1/webhooks/mercadopago/companies/'.$d->company_id.'?data.id=500', $body, $headers)->assertOk();
         }$this->assertSame(1, DB::table('payment_work')->where('kind', 'payment')->count());
         $this->assertDatabaseCount('payments', 0);
-        $this->postJson('/api/v1/webhooks/mercadopago?data.id=501', $body, $headers)->assertUnauthorized();
-        $this->gateway->response = ['id' => '500', 'collector_id' => '123', 'external_reference' => $o->id, 'preference_id' => '123-test', 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => '11.80', 'status' => 'approved', 'date_last_updated' => '2026-11-13T10:00:00Z'];
+        $this->postJson('/api/v1/webhooks/mercadopago/companies/'.$d->company_id.'?data.id=501', $body, $headers)->assertUnauthorized();
+        $this->gateway->response = ['id' => '500', 'collector_id' => $o->collector_id, 'external_reference' => $o->id, 'preference_id' => '123-test', 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => '11.80', 'status' => 'approved', 'date_last_updated' => '2026-11-13T10:00:00Z'];
         $work = DB::table('payment_work')->where('kind', 'payment')->first();
         for ($i = 0; $i < 10; $i++) {
             app(PaymentWork::class)->run($work->id);
@@ -253,26 +291,16 @@ class CollectionsTest extends DatabaseTestCase
     {
         [$u,$d] = $this->fixture();
         $o = $this->open($d);
-        // This is a contract fixture for a future credit source, not an implemented fiscal note.
-        $source = new class extends Collections
-        {
-            public int $reserved = 100;
-
-            public int $credits = 0;
-
-            public function creditExposure(Document $doc): array
-            {
-                return ['accepted_cents' => $this->credits, 'reserved_cents' => $this->reserved, 'supported' => false];
-            }
-        };
-        $this->app->instance(Collections::class, $source);
+        $series = DocumentSeries::factory()->for($u->company)->create(['doc_type' => '07', 'code' => 'BC01']);
+        $note = app(CreditNotes::class)->draft($u, $d->id, ['item_ids' => $d->items->pluck('id')->all(), 'series_id' => $series->id, 'reason' => 'Devolución completa']);
+        app(RequestIssuance::class)->handle($u, $note->id, 1, (string) Str::uuid());
         $this->order($d)->assertConflict()->assertJsonPath('code', 'credit_reserved');
         $this->getJson('/api/v1/documents/'.$d->id.'/collections')->assertOk()->assertJsonPath('data.orders.0.checkout_url', null);
-        $source->reserved = 0;
-        $source->credits = 100;
+        app(ProcessEmission::class)->handle($u->company_id, $note->id, 2);
         $this->apply($o);
-        $this->assertSame(100, $source->balance($d)['excess_cents']);
-        $this->assertSame('review', $source->balance($d)['status']);
+        $this->assertSame($d->total_cents, app(Collections::class)->balance($d)['excess_cents']);
+        $this->assertDatabaseHas('payments', ['order_id' => $o->id, 'applied_cents' => $o->amount_cents]);
+        $this->assertSame('review', app(Collections::class)->balance($d)['status']);
     }
 
     public function test_drafts_and_inactive_users_cannot_request_orders(): void

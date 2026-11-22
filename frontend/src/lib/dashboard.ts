@@ -1,23 +1,24 @@
 import { request } from './api'
 import type { Usage } from './subscriptions'
 
-export type DashboardMetric = 'accepted' | 'rejected' | 'payments' | 'outstanding' | 'excess' | 'review' | 'queued' | 'failed' | 'pdf_failed' | 'email_failed'
+export type DashboardMetric = 'credits' | 'accepted' | 'rejected' | 'payments' | 'outstanding' | 'excess' | 'review' | 'queued' | 'failed' | 'pdf_failed' | 'email_failed' | 'collection_review' | 'odoo_review'
 export const metricLabels: Record<DashboardMetric, string> = {
-  accepted: 'Emisión aceptada', rejected: 'Rechazos del periodo', payments: 'Cobrado en el periodo',
+  credits: 'Notas de crédito aceptadas', accepted: 'Emisión aceptada', rejected: 'Rechazos del periodo', payments: 'Cobrado en el periodo',
   outstanding: 'Saldo pendiente actual', excess: 'Exceso pagado actual', review: 'Documentos con pagos por revisar',
-  queued: 'En cola o procesamiento', failed: 'Fallos de emisión', pdf_failed: 'PDF con error', email_failed: 'Correo fallido o incierto',
+  queued: 'Emisiones en curso o demoradas', failed: 'Incidencias de emisión', pdf_failed: 'Incidencias de PDF', email_failed: 'Incidencias de correo', collection_review: 'Incidencias de cobranza', odoo_review:'Incidencias de Odoo',
 }
 export interface DashboardFilters { from: string; to: string; currency: string }
 export interface DashboardRow {
   id: string; document_id: string; number: string; customer: string; amount_cents: string; currency: string
   status: string; payment_status: string | null; needs_review: boolean; relevant_at: string; href: string
 }
-export interface DashboardDay { date: string; accepted_cents: string; collected_cents: string }
+export interface DashboardDay { date: string; credit_notes_cents: string; accepted_cents: string; collected_cents: string }
 export interface DashboardData {
+  bank?: {receipts:number;received_cents:string;settlement_cents:string;applied_cents:string;available_cents:string} | null
   currency: string; period: DashboardFilters; timezone: string; calculated_at: string
-  activity: { accepted_cents: string; accepted_count: number; credit_notes_cents: null; credit_notes_supported: false; collected_cents: string; payments_count: number; rejected_count: number }
+  activity: { accepted_cents: string; accepted_count: number; credit_notes_cents: string; credit_notes_supported: boolean; collected_cents: string; payments_count: number; rejected_count: number }
   portfolio: { outstanding_cents: string; outstanding_count: number; excess_cents: string; excess_count: number; review_count: number }
-  series: DashboardDay[]; alerts: Record<'queued' | 'failed' | 'pdf_failed' | 'email_failed', number>
+  series: DashboardDay[]; alerts: Record<'queued' | 'failed' | 'pdf_failed' | 'email_failed' | 'collection_review' | 'odoo_review', number>
   recent: DashboardRow[]; usage: Usage; actions: { create_document: boolean; manage_subscription: boolean }
 }
 export interface DashboardDetail { currency: string; period: DashboardFilters; calculated_at: string; detail: { metric: DashboardMetric; rows: DashboardRow[]; page: number; per_page: number; total: number; last_page: number } }

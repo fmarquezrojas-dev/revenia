@@ -17,10 +17,10 @@ export default function DocumentLookup({includeInactive=false,kind,currency,onCu
   return ()=>{active=false;clearTimeout(timer);controller.abort()}
  },[kind,currency,q,page,key,onSessionExpired,includeInactive])
  const current=result.key===key?result:undefined
- return <section className="document-lookup"><label htmlFor={'lookup-'+kind}>{kind==='customer'?'Buscar cliente activo':'Buscar producto activo de la moneda seleccionada'}</label><input id={'lookup-'+kind} type="search" value={q} onChange={e=>{setQ(e.target.value);setPage(1)}} />
+ return <section className="document-lookup"><label htmlFor={'lookup-'+kind}>{kind==='customer'?(includeInactive?'Buscar cliente':'Buscar cliente activo'):'Buscar producto activo de la moneda seleccionada'}</label><input id={'lookup-'+kind} type="search" value={q} onChange={e=>{setQ(e.target.value);setPage(1)}} />
  {!current&&<p role="status">Buscando...</p>}{current?.error&&<p role="alert">{current.error}</p>}
  {current?.rows?.length===0&&<p>No hay resultados.</p>}
  <ul className="lookup-results">{current?.rows?.map(row=><li key={row.id}>{'name' in row ? <><span>{row.name}<small>{row.doc_number}</small></span><button type="button" className="secondary" onClick={()=>onCustomer(row)}>Seleccionar cliente</button></> : <><span>{row.description}<small>{row.code} - {centsToDecimal(row.unit_price_cents)} {row.currency} sin IGV</small></span><button type="button" className="secondary" onClick={()=>onProduct(row)}>Seleccionar producto</button></>}</li>)}</ul>
- <div className="pagination"><button type="button" className="secondary" disabled={page===1} onClick={()=>setPage(page-1)}>Anterior</button><span>P?gina {page}</span><button type="button" className="secondary" disabled={!current?.last||page>=current.last} onClick={()=>setPage(page+1)}>Siguiente</button></div>
+ <div className="pagination"><button type="button" className="secondary" disabled={page===1} onClick={()=>setPage(page-1)}>Anterior</button><span>Página {page}</span><button type="button" className="secondary" disabled={!current?.last||page>=current.last} onClick={()=>setPage(page+1)}>Siguiente</button></div>
  </section>
 }

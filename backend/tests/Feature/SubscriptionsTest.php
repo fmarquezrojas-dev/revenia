@@ -10,6 +10,7 @@ use App\Actions\Subscriptions\Subscriptions;
 use App\Contracts\PaymentGateway;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\PaymentReceiver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\TestWith;
 use Tests\DatabaseTestCase;
+use Tests\Support\MerchantAccount;
 
 class SubscriptionsTest extends DatabaseTestCase
 {
@@ -32,6 +34,11 @@ class SubscriptionsTest extends DatabaseTestCase
         Storage::fake('documents');
         $this->gateway = new class implements PaymentGateway
         {
+            public function forReceiver(PaymentReceiver $receiver): PaymentGateway
+            {
+                return $this;
+            }
+
             public array $response = [];
 
             public function create(object $o): array
@@ -81,7 +88,7 @@ class SubscriptionsTest extends DatabaseTestCase
 
     private function pay(object $o, string $id = '500', string $status = 'approved', array $extra = []): void
     {
-        $this->gateway->response = array_replace(['id' => $id, 'collector_id' => '123', 'external_reference' => $o->id, 'preference_id' => $o->preference_id, 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => sprintf('%d.%02d', intdiv($o->amount_cents, 100), $o->amount_cents % 100), 'transaction_amount_refunded' => '0', 'status' => $status, 'date_last_updated' => now()->toIso8601String()], $extra);
+        $this->gateway->response = array_replace(['id' => $id, 'collector_id' => $o->collector_id, 'external_reference' => $o->id, 'preference_id' => $o->preference_id, 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => sprintf('%d.%02d', intdiv($o->amount_cents, 100), $o->amount_cents % 100), 'transaction_amount_refunded' => '0', 'status' => $status, 'date_last_updated' => now()->toIso8601String()], $extra);
         Collections::enqueue('payment', $o->company_id, $o->id, $id, (string) Str::uuid());
         $w = DB::table('payment_work')->where('kind', 'payment')->where('status', 'pending')->first();
         app(PaymentWork::class)->run($w->id);
@@ -388,6 +395,7 @@ class SubscriptionsTest extends DatabaseTestCase
         $this->pay($subscriptionOrder);
         $this->assertSame(0, app(Collections::class)->balance($d)['paid_cents']);
         $before = DB::table('subscriptions')->count();
+        MerchantAccount::create($u->company_id);
         $id = $this->postJson('/api/v1/documents/'.$d->id.'/payment-link', [], ['Idempotency-Key' => (string) Str::uuid()])->assertAccepted()->json('data.id');
         $w = DB::table('payment_work')->where('order_id', $id)->where('kind', 'create')->first();
         app(PaymentWork::class)->run($w->id);

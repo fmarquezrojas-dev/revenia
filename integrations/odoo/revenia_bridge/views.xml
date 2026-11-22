@@ -1,0 +1,25 @@
+<odoo>
+    <record id="company_revenia" model="ir.ui.view">
+        <field name="name">res.company.revenia</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <field name="vat" position="after"><field name="revenia_tenant" groups="base.group_system"/></field>
+        </field>
+    </record>
+    <record id="move_revenia" model="ir.ui.view">
+        <field name="name">account.move.revenia</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/notebook" position="inside">
+                <page string="Revenia" invisible="not revenia_key">
+                    <field name="revenia_simulated" invisible="1"/>
+                    <div class="alert alert-info" role="status" invisible="not revenia_simulated">Comprobante de emisión simulada en Revenia, sin validez tributaria.</div>
+                    <group><field name="revenia_key"/><field name="revenia_type"/><field name="revenia_number"/><field name="revenia_credit_reason" string="Motivo de rectificación" invisible="not revenia_credit_reason"/>
+                    <field name="revenia_customer_name" string="Cliente en el comprobante"/><field name="revenia_customer_number" string="Identificación del cliente"/></group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

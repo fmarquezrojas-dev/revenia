@@ -18,6 +18,7 @@ class AuthenticatedSessionController extends Controller
         $credentials = $request->validate([
             'email' => ['required', 'string', 'email', 'max:200'],
             'password' => ['required', 'string', 'max:1024'],
+            'remember' => ['sometimes', 'boolean'],
         ]);
 
         $authenticated = $this->sessionGuard()->attemptWhen(
@@ -27,7 +28,7 @@ class AuthenticatedSessionController extends Controller
                 'is_active' => true,
             ],
             fn (User $user): bool => $user->company?->is_active === true,
-            false,
+            $request->boolean('remember'),
         );
 
         if (! $authenticated) {

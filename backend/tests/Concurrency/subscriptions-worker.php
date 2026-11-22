@@ -5,6 +5,7 @@ use App\Actions\Payments\PaymentWork;
 use App\Actions\Subscriptions\Subscriptions;
 use App\Contracts\PaymentGateway;
 use App\Models\User;
+use App\Services\PaymentReceiver;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 
@@ -12,6 +13,11 @@ $c = require __DIR__.'/bootstrap.php';
 config(['payments.enabled' => true, 'payments.access_token' => 'synthetic-test-token-not-real', 'payments.collector_id' => '123', 'payments.webhook_secret' => 'synthetic-webhook-secret', 'payments.notification_url' => 'https://demo.example.test/webhook', 'payments.return_origin' => 'https://demo.example.test']);
 app()->instance(PaymentGateway::class, new class implements PaymentGateway
 {
+    public function forReceiver(PaymentReceiver $receiver): PaymentGateway
+    {
+        return $this;
+    }
+
     public function create(object $o): array
     {
         throw new RuntimeException('Unexpected external creation');

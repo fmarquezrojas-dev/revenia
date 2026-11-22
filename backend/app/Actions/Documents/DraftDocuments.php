@@ -50,6 +50,21 @@ class DraftDocuments
         return DB::transaction(function () use ($actor, $data, $id, $preview): Document|array {
             Gate::forUser($actor)->authorize('create', Document::class);
             $doc = $id ? $this->locked($actor, $id, (int) $data['version']) : null;
+            if ($doc?->doc_type === '07') {
+                $this->conflict('credit_draft', 'Prepara una nueva selección desde el comprobante de origen.');
+            }
+            $terms = $data['payment_terms'] ?? ($doc ? $doc->payment_terms : 'cash');
+            $dueDate = match ($terms) {
+                'cash' => $data['issue_date'],
+                'credit' => $data['due_date'] ?? $doc?->due_date?->toDateString(),
+                default => null,
+            };
+            if ($terms === 'credit' && ($dueDate === null || $dueDate < $data['issue_date'])) {
+                $this->invalid('due_date', 'El vencimiento debe ser igual o posterior a la emisión.');
+            }
+            if ($terms === null && isset($data['due_date'])) {
+                $this->invalid('payment_terms', 'Selecciona una condición de pago para indicar el vencimiento.');
+            }
             $series = DocumentSeries::where('company_id', $actor->company_id)->whereKey($data['series_id'])->sharedLock()->firstOrFail();
             if (! $series->is_active || $series->doc_type !== $data['doc_type']) {
                 $this->invalid('series_id', 'Selecciona una serie activa del tipo de comprobante.');
@@ -114,6 +129,8 @@ class DraftDocuments
                 $doc->version++;
             }
             $doc->fill(array_intersect_key($data, array_flip(['customer_id', 'series_id', 'doc_type', 'currency', 'issue_date'])));
+            $doc->payment_terms = $terms;
+            $doc->due_date = $dueDate;
             $doc->fill($totals);
             $doc->save();
             $keep = array_filter(array_column($lines, 'id'));

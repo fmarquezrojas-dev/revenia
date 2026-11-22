@@ -33,6 +33,8 @@ class SaveDocumentRequest extends FormRequest
             'customer_id' => ['present', 'nullable', 'uuid'], 'series_id' => ['required', 'uuid'],
             'doc_type' => ['required', 'string', 'in:01,03'], 'currency' => ['required', 'string', 'in:PEN,USD'],
             'issue_date' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.now('America/Lima')->toDateString()],
+            'payment_terms' => ['sometimes', 'required', 'in:cash,credit'],
+            'due_date' => ['nullable', 'required_if:payment_terms,credit', 'date_format:Y-m-d'],
             'items' => ['required', 'array', 'min:1', 'max:50'],
             'items.*' => ['required', 'array:id,product_id,quantity'],
             'items.*.id' => $editing ? ['sometimes', 'required', 'uuid', 'distinct:strict'] : ['missing'],
@@ -63,6 +65,8 @@ class SaveDocumentRequest extends FormRequest
             'distinct' => 'No se permiten productos ni IDs de linea duplicados.',
             'items.max' => 'El comprobante admite hasta 50 lineas.', 'items.min' => 'Agrega al menos una linea.',
             'items.*.array' => 'Solo se permiten id, product_id y quantity por linea.',
+            'due_date.required_if' => 'Indica el vencimiento de la venta a crédito.',
+            'due_date.date_format' => 'Ingresa una fecha de vencimiento válida.',
             'issue_date.before_or_equal' => 'La fecha no puede ser futura en America/Lima.',
         ];
     }

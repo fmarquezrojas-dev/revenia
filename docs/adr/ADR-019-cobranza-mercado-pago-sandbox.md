@@ -4,7 +4,7 @@ Fecha: 2026-11-13. Estado: implementado localmente; validacion externa pendiente
 
 ## Decision
 
-Checkout Pro alojado de Mercado Pago Peru, mediante Preferences API. Una cuenta receptora de pruebas por entorno; no OAuth ni incorporacion de comercios. Las referencias externas son UUID de orden local, sin datos del cliente. Cada orden pertenece a una empresa mediante claves foraneas compuestas. No representa una plataforma comercial para receptores independientes.
+Checkout Pro alojado de Mercado Pago Peru, mediante Preferences API. El diseño inicial usaba una cuenta por entorno. La migración de receptores conserva la cuenta de la plataforma para suscripciones y vincula cada comprobante con la cuenta verificada de su comercio. [Configuración vigente](../COBRANZA.md). Las referencias externas son UUID de orden local, sin datos del cliente. Cada orden pertenece a una empresa mediante claves foraneas compuestas. La verificación externa sigue pendiente.
 
 Se admite PEN. USD queda bloqueado sin conversion. El navegador no envia importes: el backend calcula el saldo completo bajo bloqueo del documento. Accepted sigue siendo el estado fiscal aunque el estado financiero sea paid.
 
@@ -40,7 +40,9 @@ Neto = original - creditos aceptados. Pendiente = max(neto - aplicado, 0). Exces
 
 Reembolsos, contracargos y mediaciones marcan revision; no se inventa una devolucion local ni se resta automaticamente un importe ya aplicado. El saldo queda provisional. Se bloquean nuevos cobros mientras exista revision. Esta version no ofrece resolucion contable manual de esos ajustes.
 
-## Dependencia de notas de credito
+## Dependencia de notas de credito en la decisión original
+
+Actualización del 2026-11-20. `CreditNotes::exposure()` agrega las líneas reservadas y aplicadas en PostgreSQL. La prueba de pago tardío usa una nota 07 emitida por el simulador.
 
 El repositorio no tiene dominio de notas de credito ni reservas: documents admite 01/03; disponer de series 07 no equivale a tener notas. Por ello credit_notes_supported=false y no se habilitan escenarios de cobranza con notas. La fuente actual devuelve cero creditos para los documentos compatibles existentes. Hay un contrato creditExposure y pruebas con una fuente de prueba para reservas y pago tardio, pero NO constituyen notas fiscales implementadas ni una prueba de concurrencia real entre notas y pagos. Antes de habilitarlas deben implementarse sus estados/reservas, fuente persistente y el mismo bloqueo de documents, y ejecutar pruebas de carreras credito/pago. Esa dependencia sigue pendiente.
 

@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useEffect, useRef, useState } from 'react'
 import { ApiError, customerErrorMessage, getCustomer, updateCustomer } from '../lib/api'
 import type { Customer } from '../lib/api'
@@ -87,6 +87,10 @@ export default function CustomerDetails({ id, canWrite, onBack, onChanged, onSes
             <div><dt>Dirección</dt><dd>{customer.address || 'No registrada'}</dd></div>
             <div><dt>Correo electrónico</dt><dd>{customer.email || 'No registrado'}</dd></div>
           </dl>
+          <div className="form-actions">
+            <Link to={'/customers/' + customer.id + '/statement'}>Estado de cuenta</Link>
+            <Link to={'/bank-receipts?customer_id=' + customer.id}>Cobros bancarios del cliente</Link>
+          </div>
           {canWrite && <div className="form-actions">
             <button type="button" disabled={saving} onClick={() => { setNotice(''); setEditing(true) }}>Editar cliente</button>
             <button type="button" className="secondary" disabled={saving} onClick={toggleActive}>

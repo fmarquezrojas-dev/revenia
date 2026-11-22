@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, useBlocker, useLocation } from 'react-router'
-import { LayoutDashboard, FileText, Building2, ChevronDown, ContactRound, Hash, LogOut, Menu, Package, UserRound, Users, X } from 'lucide-react'
+import { Plug, ClipboardList, Wallet, LayoutDashboard, FileText, Building2, ChevronDown, ContactRound, Hash, LogOut, Menu, Package, UserRound, Users, X } from 'lucide-react'
 import { pages } from '../app/navigation'
 import type { PageKey } from '../app/navigation'
 import { FormGuardContext } from '../app/FormGuard'
 import type { Guard } from '../app/FormGuard'
 import type { SessionUser } from '../lib/api'
-const icons = { dashboard: LayoutDashboard, subscription: Hash, documents: FileText, account: UserRound, customers: ContactRound, products: Package, company: Building2, users: Users, series: Hash }
+const icons = { 'bank-receipts': Wallet, integrations: Plug, incidents: ClipboardList, collections: Wallet, receivables: Wallet, dashboard: LayoutDashboard, subscription: Hash, documents: FileText, account: UserRound, customers: ContactRound, products: Package, company: Building2, users: Users, series: Hash }
 interface Props { user: SessionUser; busy: boolean; saving: boolean; onLogout: () => Promise<void>; children: ReactNode }
 export default function AppShell({ user, busy, saving, onLogout, children }: Props) {
   const location = useLocation()
@@ -54,7 +54,7 @@ export default function AppShell({ user, busy, saving, onLogout, children }: Pro
     <Link to="/dashboard" className="brand"><span className="brand-mark" aria-hidden="true">R</span><span>Revenia</span></Link>
     <div className="company-context"><span className="eyebrow">EMPRESA ACTUAL</span><strong>{user.company.trade_name || user.company.legal_name}</strong><span className="muted">Espacio de trabajo</span></div>
     <nav aria-label={mobile ? 'Navegación móvil' : 'Navegación principal'}>
-      {['Operación', 'Configuración', 'Cuenta'].map((group) => {
+      {['Operación', 'Tesorería', 'Configuración', 'Cuenta'].map((group) => {
         const entries = (Object.entries(pages) as [PageKey, typeof pages[PageKey]][]).filter(([, item]) => item.group === group && (!item.owner || user.role === 'owner'))
         return entries.length > 0 && <div className="nav-group" key={group}><p>{group}</p>{entries.map(([id, item]) => {
           const Icon = icons[id]
@@ -62,7 +62,6 @@ export default function AppShell({ user, busy, saving, onLogout, children }: Pro
         })}</div>
       })}
     </nav>
-    <div className="sidebar-foot"><span className="demo-dot" />Entorno de demostración</div>
   </>
   return <FormGuardContext.Provider value={guardContext}>
     <div className="workspace">
@@ -89,7 +88,6 @@ export default function AppShell({ user, busy, saving, onLogout, children }: Pro
           }}><LogOut size={17} aria-hidden="true" />{busy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button></div>
         </details></header>
         <main id="main-content" className="main-content"><div className="page-heading"><span className="eyebrow">{page?.group ?? 'Revenia'}</span><h1 ref={heading} tabIndex={-1}>{page?.title ?? 'Página no encontrada'}</h1><p>{page?.description ?? 'Comprueba la dirección o vuelve a una sección disponible.'}</p></div>{children}</main>
-        <footer className="workspace-footer">Demostración · Emisión tributaria simulada</footer>
       </div>
     </div>
   </FormGuardContext.Provider>

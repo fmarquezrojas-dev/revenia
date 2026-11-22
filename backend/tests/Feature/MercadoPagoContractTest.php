@@ -2,16 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\PaymentGateway;
 use App\Domain\Money\ProviderAmount;
+use App\Models\User;
 use App\Services\MercadoPagoGateway;
 use App\Services\MercadoPagoSignature;
+use App\Services\PaymentReceiver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\TestWith;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Tests\TestCase;
+use Tests\DatabaseTestCase;
+use Tests\Support\MerchantAccount;
 
-class MercadoPagoContractTest extends TestCase
+class MercadoPagoContractTest extends DatabaseTestCase
 {
     protected function setUp(): void
     {
@@ -27,6 +31,20 @@ class MercadoPagoContractTest extends TestCase
         $this->assertSame(9007199254740991, ProviderAmount::cents($v['transaction_amount']));
         $this->assertSame('12345678901234567890', $v['id']);
         $this->assertFalse($v['live_mode']);
+    }
+
+    private function scopedGateway(object $order): PaymentGateway
+    {
+        $order->company_id = User::factory()->create()->company_id;
+        $merchant = isset($order->document_id) && $order->document_id !== null;
+        $order->environment = 'sandbox';
+        $order->receiver_kind = $merchant ? 'merchant' : 'platform';
+        $order->collector_id = $merchant ? '456' : '123';
+        $order->connection_id = $merchant ? MerchantAccount::create($order->company_id) : null;
+        $order->subscription_id ??= $merchant ? null : 'subscription-id';
+        $order->document_id ??= null;
+
+        return app(MercadoPagoGateway::class)->forReceiver(PaymentReceiver::forOrder($order));
     }
 
     #[TestWith([1.20])]
@@ -45,8 +63,9 @@ class MercadoPagoContractTest extends TestCase
     public function test_creation_checks_receiver_and_sends_exact_amount_once(bool $subscription): void
     {
         $o = (object) ['id' => 'order-id', 'document_id' => $subscription ? null : 'document-id', 'subscription_id' => $subscription ? 'subscription-id' : null, 'currency' => 'PEN', 'amount_cents' => 4065, 'expires_at' => now()->addDay(), 'preference_id' => null];
-        Http::fake(['https://api.mercadolibre.com/users/me' => Http::response(['id' => 123, 'site_id' => 'MPE', 'tags' => ['test_user']]), 'https://api.mercadopago.com/checkout/preferences' => Http::response('{"id":"123-test","external_reference":"order-id","collector_id":123,"site_id":"MPE","items":[{"currency_id":"PEN","quantity":1,"unit_price":40.65}],"init_point":"https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=123-test"}', 201)]);
-        $p = app(MercadoPagoGateway::class)->create($o);
+        $gateway = $this->scopedGateway($o);
+        Http::fake(['https://api.mercadolibre.com/users/me' => Http::response(['id' => $o->collector_id, 'site_id' => 'MPE', 'tags' => ['test_user']]), 'https://api.mercadopago.com/checkout/preferences' => Http::response('{"id":"123-test","external_reference":"order-id","collector_id":'.$o->collector_id.',"site_id":"MPE","items":[{"currency_id":"PEN","quantity":1,"unit_price":40.65}],"init_point":"https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=123-test"}', 201)]);
+        $p = $gateway->create($o);
         $this->assertSame('123-test', $p['id']);
         $return = 'https://demo.example.test'.($subscription ? '/subscription' : '/documents/document-id').'?payment_return=1';
         Http::assertSent(fn ($r) => $r->method() === 'POST' && $r['back_urls']['success'] === $return && $r['back_urls']['pending'] === $return && $r['back_urls']['failure'] === $return);
@@ -58,7 +77,8 @@ class MercadoPagoContractTest extends TestCase
     {
         Http::fake(['https://api.mercadolibre.com/users/me' => Http::response(['id' => 123, 'site_id' => 'MPE', 'tags' => []])]);
         try {
-            app(MercadoPagoGateway::class)->create((object) []);
+            $order = (object) [];
+            $this->scopedGateway($order)->create($order);
             $this->fail('Production receiver accepted');
         } catch (\DomainException $e) {
             $this->assertSame('test_receiver_unverified', $e->getMessage());
@@ -68,7 +88,7 @@ class MercadoPagoContractTest extends TestCase
     public function test_payment_is_joined_to_authoritative_merchant_order(): void
     {
         Http::fake(['https://api.mercadopago.com/v1/payments/500' => Http::response(['id' => 500, 'external_reference' => 'reference', 'order' => ['id' => 700, 'type' => 'mercadopago']]), 'https://api.mercadopago.com/merchant_orders/700' => Http::response(['id' => 700, 'external_reference' => 'reference', 'collector' => ['id' => 123], 'preference_id' => '123-test'])]);
-        $this->assertSame('123-test', app(MercadoPagoGateway::class)->payment('500')['preference_id']);
+        $this->assertSame('123-test', $this->scopedGateway((object) [])->payment('500')['preference_id']);
         Http::assertSentCount(2);
     }
 
@@ -77,10 +97,10 @@ class MercadoPagoContractTest extends TestCase
         $r = Request::create('/?data.id=500');
         $r->headers->set('x-request-id', 'request-1');
         $r->headers->set('x-signature', 'ts=1700000000,v1='.hash_hmac('sha256', 'id:500;request-id:request-1;ts:1700000000;', config('payments.webhook_secret')));
-        $this->assertSame('500', app(MercadoPagoSignature::class)->paymentId($r));
+        $this->assertSame('500', app(MercadoPagoSignature::class)->paymentId($r, config('payments.webhook_secret')));
         $r->server->set('QUERY_STRING', 'data.id=500&data.id=501');
         $this->expectException(HttpException::class);
-        app(MercadoPagoSignature::class)->paymentId($r);
+        app(MercadoPagoSignature::class)->paymentId($r, config('payments.webhook_secret'));
     }
 
     #[TestWith(['https://evil.test/checkout/v1/redirect?pref_id=a'])]
@@ -98,12 +118,12 @@ class MercadoPagoContractTest extends TestCase
     {
         Http::fake(['https://api.mercadopago.com/v1/payments/search*' => Http::response($response)]);
         $this->expectException(\DomainException::class);
-        app(MercadoPagoGateway::class)->paymentIds((object) ['id' => 'reference']);
+        $this->scopedGateway((object) [])->paymentIds((object) ['id' => 'reference']);
     }
 
     public function test_payment_search_returns_only_validated_identifiers(): void
     {
         Http::fake(['https://api.mercadopago.com/v1/payments/search*' => Http::response(['paging' => ['total' => 1], 'results' => [['id' => 500, 'external_reference' => 'reference']]])]);
-        $this->assertSame(['500'], app(MercadoPagoGateway::class)->paymentIds((object) ['id' => 'reference']));
+        $this->assertSame(['500'], $this->scopedGateway((object) [])->paymentIds((object) ['id' => 'reference']));
     }
 }

@@ -7,6 +7,7 @@ use App\Jobs\ProcessPaymentWork;
 use App\Models\Company;
 use App\Models\Document;
 use App\Services\MercadoPagoGateway;
+use App\Services\PaymentReceiver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -33,14 +34,42 @@ class PaymentWork
         }
         $order = $work->order_id ? DB::table('payment_orders')->where('company_id', $work->company_id)->find($work->order_id) : null;
         try {
+            if ($work->order_id && ! $order) {
+                throw new \DomainException('order_not_found');
+            }
+            if ($work->webhook_scope) {
+                $receiver = PaymentReceiver::forWebhook($work->connection_id);
+                if ($work->webhook_scope !== $receiver->kind || $work->webhook_collector_id !== $receiver->collector || ($receiver->company && $receiver->company !== $work->company_id)) {
+                    throw new \DomainException('receiver_mismatch');
+                }
+                if ($order) {
+                    $receiver->assertOrder($order);
+                }
+            } elseif ($order) {
+                $receiver = PaymentReceiver::forOrder($order);
+            } else {
+                throw new \DomainException('receiver_unknown');
+            }
+            $gateway = $this->gateway->forReceiver($receiver);
+            if ($order && $order->document_id) {
+                Collections::audit($order, $work, 'work_started', payment: $work->payment_id);
+            }
             if ($work->kind === 'payment') {
-                $p = $this->gateway->payment($work->payment_id);
+                $p = $gateway->payment($work->payment_id);
                 if (! $order && is_string($p['external_reference'] ?? null) && Str::isUuid($p['external_reference'])) {
-                    $order = DB::table('payment_orders')->find($p['external_reference']);
+                    $order = DB::table('payment_orders')->where('receiver_kind', $receiver->kind)
+                        ->where('collector_id', $receiver->collector)->where('connection_id', $receiver->connection)
+                        ->when($receiver->company, fn ($q, $company) => $q->where('company_id', $company))->find($p['external_reference']);
                     if ($order) {
                         DB::table('payment_work')->where('id', $work->id)->where('token', $work->token)->update(['company_id' => $order->company_id, 'order_id' => $order->id]);
                     }
                 }
+                if (! $order) {
+                    throw new \DomainException('order_not_found');
+                }
+                $receiver->assertOrder($order);
+                $work->order_id = $order->id;
+                $work->company_id = $order->company_id;
                 $this->collections->apply($p, $work);
             } else {
                 if (! $order) {
@@ -67,17 +96,18 @@ class PaymentWork
 
                         return;
                     }
-                    $preference = $this->gateway->create($order);
+                    $preference = $gateway->create($order);
                     $this->publishPreference($order, $work, $preference);
                 } elseif (! $order->preference_id) {
-                    $preference = $this->gateway->recover($order);
+                    $preference = $gateway->recover($order);
                     if (! $preference) {
                         throw new \RuntimeException('preference_not_found_yet');
-                    }$this->publishPreference($order, $work, $preference);
+                    }
+                    $this->publishPreference($order, $work, $preference);
                 }
                 if ($work->kind === 'reconcile') {
                     $order = DB::table('payment_orders')->find($order->id);
-                    $payments = $this->gateway->paymentIds($order);
+                    $payments = $gateway->paymentIds($order);
                     DB::transaction(function () use ($order, $work, $payments): void {
                         $claim = DB::table('payment_work')->where('id', $work->id)->lockForUpdate()->first();
                         if ($claim->token !== $work->token || $claim->status !== 'processing' || now()->gte($claim->lease_until)) {
@@ -90,34 +120,48 @@ class PaymentWork
                     });
                 }
             }
-            $this->finish($work, 'done');
-            Collections::audit($order, $work, 'work_completed');
+            if ($this->finish($work, 'done')) {
+                Collections::audit($order, $work, 'work_completed');
+            }
         } catch (\Throwable $e) {
             $code = $e instanceof \DomainException ? $e->getMessage() : 'provider_unavailable';
             if (! preg_match('/\A[a-z_]{1,80}\z/', $code)) {
                 $code = 'provider_mismatch';
             }
-            if ($work->kind === 'create') {
-                DB::table('payment_orders')->where('id', $work->order_id)->where('status', 'creating')->update(['status' => 'unknown', 'error_code' => 'checkout_creation_uncertain', 'updated_at' => now()]);
-            }
-            $permanent = $e instanceof \DomainException;
-            $status = $permanent ? 'review' : ($work->attempts >= 5 ? 'failed' : 'pending');
-            $this->finish($work, $status, $code);
-            Collections::audit($order, $work, 'work_failed', $code, $work->payment_id);
+            DB::transaction(function () use ($order, $work, $e, $code): void {
+                // Lock in the same order as preference publication and payment application.
+                if ($order) {
+                    DB::table('payment_orders')->where('id', $order->id)->lockForUpdate()->first();
+                }
+                $rejectedBeforePost = $work->kind === 'create' && $work->attempts === 1 && $code === 'test_receiver_unverified';
+                $status = $rejectedBeforePost ? 'done' : ($e instanceof \DomainException ? 'review' : ($work->attempts >= 5 ? 'failed' : 'pending'));
+                if (! $this->finish($work, $status, $code)) {
+                    return;
+                }
+                if ($work->kind === 'create') {
+                    DB::table('payment_orders')->where('id', $work->order_id)->where('status', 'creating')
+                        ->update(['status' => $rejectedBeforePost ? 'failed' : 'unknown',
+                            'error_code' => $rejectedBeforePost ? $code : 'checkout_creation_uncertain', 'updated_at' => now()]);
+                }
+                Collections::audit($order, $work, 'work_failed', $code, $work->payment_id);
+            });
         }
     }
 
     private function balanceForOrder(object $order): array
     {
-        Company::whereKey($order->company_id)->lockForUpdate()->firstOrFail();
+        $company = Company::whereKey($order->company_id)->lockForUpdate()->firstOrFail();
         if ($order->subscription_id) {
             $s = DB::table('subscriptions')->where('company_id', $order->company_id)->where('id', $order->subscription_id)->lockForUpdate()->firstOrFail();
 
-            return ['eligible' => $s->status === 'pending', 'reserved_cents' => 0, 'needs_review' => DB::table('subscriptions')->where('company_id', $order->company_id)->where('status', 'review')->exists(), 'outstanding_cents' => $s->status === 'pending' ? (int) $s->price_cents : 0];
+            return ['eligible' => $company->is_active && $s->status === 'pending', 'reserved_cents' => 0, 'needs_review' => DB::table('subscriptions')->where('company_id', $order->company_id)->where('status', 'review')->exists(), 'outstanding_cents' => $s->status === 'pending' ? (int) $s->price_cents : 0];
         }
         $doc = Document::where('company_id', $order->company_id)->whereKey($order->document_id)->lockForUpdate()->firstOrFail();
 
-        return $this->collections->balance($doc) + ['eligible' => $doc->status === 'accepted'];
+        $active = DB::table('merchant_connections')->where('company_id', $order->company_id)
+            ->where('id', $order->connection_id)->where('active', true)->exists();
+
+        return $this->collections->balance($doc) + ['eligible' => $company->is_active && $doc->status === 'accepted' && $active];
     }
 
     private function publishPreference(object $order, object $work, array $p): void
@@ -135,16 +179,20 @@ class PaymentWork
             if ($o->preference_id && $o->preference_id !== $p['id']) {
                 throw new \DomainException('preference_conflict');
             }
-            DB::table('payment_work')->where('order_id', $o->id)->whereIn('kind', ['create', 'reconcile'])->whereIn('status', ['failed', 'review'])->update(['status' => 'resolved', 'updated_at' => now()]);
+            $resolved = DB::table('payment_work')->where('order_id', $o->id)->whereIn('kind', ['create', 'reconcile'])
+                ->whereIn('status', ['failed', 'review'])->update(['status' => 'resolved', 'updated_at' => now()]);
+            if ($resolved) {
+                $b = $this->balanceForOrder($order);
+            }
 
             $status = now()->gte($o->expires_at) ? 'expired' : ($b['outstanding_cents'] === (int) $o->amount_cents && $b['reserved_cents'] === 0 && ! $b['needs_review'] && $b['eligible'] && ! in_array($o->status, ['closed', 'stale'], true) ? 'open' : 'stale');
             DB::table('payment_orders')->where('id', $o->id)->update(['preference_id' => $p['id'], 'checkout_url' => $p['url'], 'status' => $status, 'error_code' => null, 'updated_at' => now()]);
         });
     }
 
-    private function finish(object $work, string $status, ?string $code = null): void
+    private function finish(object $work, string $status, ?string $code = null): bool
     {
-        DB::table('payment_work')->where('id', $work->id)->where('token', $work->token)->where('status', 'processing')->where('lease_until', '>', now())->update(['status' => $status, 'token' => null, 'lease_until' => null, 'published_at' => null, 'available_at' => now()->addSeconds(min(900, 30 * (2 ** ($work->attempts - 1)))), 'error_code' => $code, 'updated_at' => now()]);
+        return (bool) DB::table('payment_work')->where('id', $work->id)->where('token', $work->token)->where('status', 'processing')->where('lease_until', '>', now())->update(['status' => $status, 'token' => null, 'lease_until' => null, 'published_at' => null, 'available_at' => now()->addSeconds(min(900, 30 * (2 ** ($work->attempts - 1)))), 'error_code' => $code, 'updated_at' => now()]);
     }
 
     public function tick(?string $company = null, int $limit = 50): int
@@ -154,7 +202,7 @@ class PaymentWork
         $scope()->where('status', 'pending')->where('attempts', '>=', 5)->update(['status' => 'failed', 'error_code' => 'attempts_exhausted', 'updated_at' => now()]);
         DB::table('payment_orders')->when($company, fn ($q) => $q->where('company_id', $company))->where('status', 'open')->where('expires_at', '<=', now())->update(['status' => 'expired', 'updated_at' => now()]);
         // Bounded periodic reconciliation also recovers missing webhooks for recent checkouts.
-        $recent = DB::table('payment_orders')->when($company, fn ($q) => $q->where('company_id', $company))->whereNotNull('preference_id')->where('created_at', '>=', now()->subDays(7))->where(fn ($q) => $q->whereNull('last_reconciled_at')->orWhere('last_reconciled_at', '<=', now()->subMinutes(5)))->orderBy('created_at')->limit(min($limit, 25))->get();
+        $recent = DB::table('payment_orders')->when($company, fn ($q) => $q->where('company_id', $company))->where('receiver_kind', '<>', 'legacy')->whereNotNull('preference_id')->where('created_at', '>=', now()->subDays(7))->where(fn ($q) => $q->whereNull('last_reconciled_at')->orWhere('last_reconciled_at', '<=', now()->subMinutes(5)))->orderBy('created_at')->limit(min($limit, 25))->get();
         foreach ($recent as $order) {
             DB::transaction(function () use ($order): void {
                 $current = DB::table('payment_orders')->where('id', $order->id)->lockForUpdate()->first();

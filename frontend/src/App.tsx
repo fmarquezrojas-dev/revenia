@@ -58,21 +58,18 @@ export default function App() {
   })
 
   const [sessionAttempt, setSessionAttempt] = useState(0)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const messageRef = useRef<HTMLParagraphElement>(null)
 
   const handleSessionExpired = useCallback(() => {
-    setEmail('')
-    setPassword('')
+    setVisiblePassword(false)
     setSession({ status: 'guest' })
     setMessage(
       'Tu sesión ya no está disponible. Inicia sesión nuevamente.',
     )
-    const target = safeDestination(locationRef.current.pathname + locationRef.current.search)
+    const target = safeDestination(locationRef.current.pathname + locationRef.current.search + locationRef.current.hash)
     navigate('/acceso?next=' + encodeURIComponent(target), { replace: true })
   }, [navigate])
 
@@ -158,22 +155,25 @@ export default function App() {
     event.preventDefault()
 
     if (loginLock.current) return
+    const loginForm = event.currentTarget
+    const form = new FormData(loginForm)
     loginLock.current = true
 
     setBusy(true)
     setMessage('')
 
     try {
-      const user = await login(email.trim(), password)
+      const user = await login(String(form.get('email') ?? '').trim(), String(form.get('password') ?? ''), form.has('remember'))
 
-      setPassword('')
+      setVisiblePassword(false)
       setSession({
         status: 'authenticated',
         user,
       })
       navigate(safeDestination(new URLSearchParams(location.search).get('next')), { replace: true })
     } catch (error: unknown) {
-      setPassword('')
+      const field = loginForm.elements.namedItem('password')
+      if (field instanceof HTMLInputElement && field.value === form.get('password')) field.value = ''
       setMessage(errorMessage(error))
     } finally {
       loginLock.current = false
@@ -191,14 +191,12 @@ export default function App() {
     try {
       await logout()
 
-      setEmail('')
-      setPassword('')
+      setVisiblePassword(false)
       setSession({ status: 'guest' })
       navigate('/acceso', { replace: true })
     } catch (error: unknown) {
       if (error instanceof ApiError && error.status === 401) {
-        setEmail('')
-        setPassword('')
+        setVisiblePassword(false)
         setSession({ status: 'guest' })
       } else {
         setMessage(errorMessage(error))
@@ -218,7 +216,7 @@ export default function App() {
   if (session.status === 'loading') return <AuthLayout><p role="status">Comprobando tu sesión…</p></AuthLayout>
   if (session.status === 'error') return <AuthLayout><h1>No pudimos cargar tu sesión</h1><p role="alert">{session.message}</p><button onClick={retrySession}>Reintentar</button></AuthLayout>
   if (session.status === 'guest' && location.pathname !== '/acceso') {
-    return <Navigate to={'/acceso?next=' + encodeURIComponent(safeDestination(location.pathname + location.search))} replace />
+    return <Navigate to={'/acceso?next=' + encodeURIComponent(safeDestination(location.pathname + location.search + location.hash))} replace />
   }
   if (session.status === 'authenticated') {
     if (location.pathname === '/acceso' || location.pathname === '/') return <Navigate to={safeDestination(new URLSearchParams(location.search).get('next'))} replace />
@@ -228,15 +226,16 @@ export default function App() {
   return <AuthLayout>
     <span className="eyebrow">TU ESPACIO DE TRABAJO</span>
     <h1>Inicia sesión</h1><p className="muted">Accede a la cuenta de tu empresa.</p>
-    <form onSubmit={handleLogin} aria-busy={busy} className="login-form">
-      <fieldset disabled={busy}>
+    <form method="post" action="/login" autoComplete="on" onSubmit={handleLogin} aria-busy={busy} className="login-form">
+      <fieldset>
         <label htmlFor="email">Correo electrónico</label>
-        <input id="email" name="email" type="email" autoComplete="username" required maxLength={200} value={email} onChange={(event) => setEmail(event.target.value)} />
+        <input id="email" name="email" type="email" autoComplete="username" required maxLength={200} />
         <label htmlFor="password">Contraseña</label>
-        <div className="password-field"><input id="password" name="password" type={visiblePassword ? 'text' : 'password'} autoComplete="current-password" required maxLength={1024} value={password} onChange={(event) => setPassword(event.target.value)} />
+        <div className="password-field"><input id="password" name="password" type={visiblePassword ? 'text' : 'password'} autoComplete="current-password" required maxLength={1024} />
           <button type="button" className="icon-button" aria-label={visiblePassword ? 'Ocultar contraseña' : 'Mostrar contraseña'} aria-pressed={visiblePassword} onClick={() => setVisiblePassword(!visiblePassword)}>{visiblePassword ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}</button></div>
+        <label className="remember-session" htmlFor="remember"><input type="checkbox" id="remember" name="remember" disabled={busy} />Mantener mi sesión en este dispositivo</label>
         {message && <p className="error" role="alert" tabIndex={-1} ref={messageRef}>{message}</p>}
-        <button type="submit" className="login-submit">{busy ? 'Ingresando…' : 'Ingresar'}</button>
+        <button type="submit" disabled={busy} className="login-submit">{busy ? 'Ingresando…' : 'Ingresar'}</button>
       </fieldset>
     </form>
   </AuthLayout>

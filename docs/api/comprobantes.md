@@ -5,9 +5,17 @@ PDF privado, correo, permisos y errores: [contrato de entrega](../PDF_Y_CORREO.m
 Emision, reintento, estados e historial: [contrato y operacion](../EMISION_SIMULADA.md).
 El contrato de borradores siguiente se conserva; los numerados son inmutables.
 
+## Notas de crédito simuladas
+
+`POST /api/v1/documents/{documentId}/credit-notes` crea un borrador 07 desde una factura o boleta aceptada. Owner e issuer envían `{"series_id":"UUID","item_ids":["UUID_LINEA_ORIGINAL"],"reason":"Devolución de accesorio"}`. La respuesta 201 incluye el documento, su origen y los importes históricos. La serie activa usa F para factura y B para boleta. El servidor toma la moneda, el receptor, los precios y los impuestos del original.
+
+El detalle GET del original incluye `credit.notes`, `credit.states` por ID de línea, las series compatibles para el rol y el neto y los pagos para la vista previa. Una línea ausente del mapa está disponible. La nota incluye `source_document_id`, `source_number` y `credit_reason`. Para cambiar la selección guardada, elimina el borrador y prepara otro desde el origen.
+
+Se reutilizan `issue`, `retry`, `events` y `pdf`. Un 409 al reservar significa que debe revisarse la disponibilidad. Cada primera emisión consume una unidad. La cobranza se consulta sobre el original.
+
 # Comprobantes: borradores del simulador
 
-Contrato: OpenAPI 1.4.0 en openapi.json. Autenticacion Sanctum por cookies;
+Contrato: OpenAPI 1.10.0 en openapi.json. Autenticacion Sanctum por cookies;
 CSRF en POST/PATCH/DELETE. Owner e issuer escriben/previsualizan; accountant
 solo lista y consulta. Referencias ajenas/no existentes: 404; accion propia
 sin permiso: 403; sin sesion: 401; validacion: 422; conflictos: 409.
@@ -17,7 +25,7 @@ sin permiso: 403; sin sesion: 401; validacion: 422; conflictos: 409.
 POST /api/v1/documents, respuesta 201 {data: documento}:
 
 ```json
-{"doc_type":"01","currency":"PEN","issue_date":"2026-11-11",
+{"doc_type":"01","currency":"PEN","issue_date":"2026-11-11","payment_terms":"credit","due_date":"2026-12-11",
  "customer_id":"UUID_CLIENTE","series_id":"UUID_SERIE",
  "items":[{"product_id":"UUID_PRODUCTO","quantity":"3.000"}]}
 ```
@@ -28,6 +36,20 @@ unicos de la moneda seleccionada. Precio, descripcion, unidad y afectacion se
 obtienen del servidor. Empresa y creador proceden de la sesion.
 Se rechazan company_id, created_by, status, number, issued_at y todos los totales,
 incluso null; tampoco se aceptan snapshots arbitrarios en items.
+
+### Condición de pago y vencimiento
+
+El alta, la edición y la previsualización aceptan `payment_terms` (`cash` o `credit`). El servidor fija el vencimiento de contado en `issue_date`. Al enviar `credit`, se requiere `due_date` en formato YYYY-MM-DD, igual o posterior a la emisión. Los errores de estos campos se devuelven con 422. Por compatibilidad, un alta que omite la condición usa contado. Una edición que omite ambos campos conserva la condición previa, incluso si un borrador histórico carece de ella.
+
+La respuesta del documento incluye los dos campos, que pueden ser nulos en documentos históricos y notas 07. La numeración vuelve inmutables las condiciones junto con la cabecera.
+
+### Cartera actual
+
+`GET /api/v1/receivables` admite sesiones activas con permiso de consulta de comprobantes. La empresa se obtiene de la sesión. Los filtros disponibles son `currency` (PEN por defecto o USD), `q` (nombre o identificación del cliente, o número del comprobante), `due_from`, `due_to` (fechas inclusivas), `situation`, `sort` (oldest/newest) y `page`. El orden usa vencimiento, fecha de emisión e identidad. Los documentos sin vencimiento figuran al final.
+
+`data.cutoff` es la fecha actual en America/Lima. `data.summary` contiene importes en cadenas de céntimos para toda la selección. Incluye `total`, `upcoming`, `today`, `overdue`, `undated` y los tramos `late_1_30`, `late_31_60`, `late_61_90` y `late_over_90`. Cada situación o tramo se puede usar como filtro. El día de vencimiento tiene cero días de atraso. Para un vencimiento desconocido, `days_late` es nulo. `rows` contiene hasta 20 facturas y boletas aceptadas con saldo positivo. `total`, `page`, `per_page` y `last_page` describen la paginación.
+
+El detalle individual, la cartera y el dashboard comparten el cálculo del saldo. Los pagos aplicados y los créditos aceptados reducen la deuda de origen. Las reservas pendientes se conservan por separado. Los saldos en exceso se consultan en el flujo de revisión.
 
 ## Editar, previsualizar, eliminar
 

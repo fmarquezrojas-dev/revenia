@@ -1,8 +1,14 @@
 <?php
 
+use App\Actions\Documents\CreditNotes;
 use App\Actions\Issuance\EmissionOutbox;
+use App\Actions\Issuance\ProcessEmission;
 use App\Actions\Issuance\RequestIssuance;
+use App\Actions\Payments\DocumentBalances;
+use App\Actions\Treasury\BankReceipts;
+use App\Models\Customer;
 use App\Models\Document;
+use App\Models\DocumentSeries;
 use App\Models\User;
 use Illuminate\Queue\Connectors\RedisConnector;
 use Illuminate\Redis\RedisManager;
@@ -113,4 +119,48 @@ Artisan::call('queue:work', ['connection' => 'issuance_live', '--queue' => 'emis
 verify($redisDoc->fresh()->status === 'accepted' && $redisDoc->fresh()->attempt_count === 1 && $redisDoc->fresh()->number === 1, 'Real Redis job must finish once with its original number');
 verify(Queue::connection('issuance_live')->size('emissions') === 0, 'Isolated Redis queue must be empty');
 $manager->purge('default');
-echo json_encode(['result' => 'PASS', 'same_key' => $same, 'different_keys' => $different, 'same_series' => $series, 'duplicate_jobs' => $jobs, 'publishers' => $publishers, 'numbers' => [1, 2, 3, 4], 'redis_unavailable_then_recovered' => 'PASS', 'duplicate_pdf_workers' => $pdfWorkers], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;
+$creditSeries = DocumentSeries::factory()->for($actor->company)->create(['doc_type' => '07', 'code' => 'BC01']);
+// The older concurrency fixtures are zero-valued. Create one creditable historical line.
+$original = Document::factory()->create(['company_id' => $actor->company_id, 'created_by' => $actor->id]);
+$original->items()->first()->update(['unit_price_cents' => 2000]);
+app(RequestIssuance::class)->handle($actor, $original->id, 1, (string) Str::uuid());
+app(ProcessEmission::class)->handle($actor->company_id, $original->id, 2);
+$selection = ['item_ids' => $original->items->pluck('id')->all(), 'series_id' => $creditSeries->id, 'reason' => 'Devolución simultánea'];
+$inputs = [];
+for ($i = 0; $i < 2; $i++) {
+    $note = app(CreditNotes::class)->draft($actor, $original->id, $selection);
+    $inputs[] = ['issue', $actor->id, $note->id, (string) Str::uuid()];
+}
+$creditRace = race($inputs);
+$statuses = array_column($creditRace, 'status');
+sort($statuses);
+verify($statuses === [202, 409] && $creditSeries->fresh()->current_number === 1 && DB::table('credit_note_lines')->where('state', 'reserved')->count() === 1
+    && DB::table('emission_consumptions')->whereIn('document_id', array_column($inputs, 2))->count() === 1, 'Overlapping credits must reserve one line and consume one number and quota');
+$owner = User::factory()->create(['role' => 'owner']);
+$customer = Customer::factory()->for($owner->company)->create();
+$sales = [];
+foreach ([1, 2] as $number) {
+    $sale = Document::factory()->create(['company_id' => $owner->company_id, 'created_by' => $owner->id,
+        'customer_id' => $customer->id, 'exempt_cents' => 5000, 'total_cents' => 5000]);
+    $sale->update(['status' => 'accepted', 'series_code' => $sale->series->code, 'number' => $number,
+        'issued_at' => now(), 'submission_id' => (string) Str::uuid(), 'fiscal_snapshot' => ['customer' => ['id' => $customer->id]]]);
+    $sales[] = $sale;
+}
+BankReceipts::write($owner, 'manage-treasury', fn ($user) => BankReceipts::account($user, null, [
+    'alias' => 'Prueba', 'institution' => 'Prueba', 'currency' => 'PEN', 'active' => true,
+]));
+$account = DB::table('bank_accounts')->where('company_id', $owner->company_id)->value('id');
+$bank = fn ($action, $id, $fields) => BankReceipts::write($owner, 'manage-treasury',
+    fn ($user) => app(BankReceipts::class)->execute($user, $action, $id, $fields + ['request_id' => (string) Str::uuid()]));
+$receipt = $bank('register', null, ['account_id' => $account, 'customer_id' => $customer->id, 'bank_date' => now('America/Lima')->toDateString(),
+    'currency' => 'PEN', 'origin' => 'customer', 'reference' => 'RC11', 'method' => 'deposit', 'amount_cents' => 5000])['id'];
+$bank('confirm', $receipt, ['revision' => 1, 'verified' => true, 'origin' => 'customer']);
+$bankRace = race(array_map(fn ($sale) => ['bank', $owner->id, $sale->id, $receipt], $sales));
+$statuses = array_column($bankRace, 'status');
+sort($statuses);
+verify($statuses === [200, 409], 'A concurrent distribution of the same receipt must have one winner');
+verify(DB::table('bank_applications')->where('receipt_id', $receipt)->count() === 1
+    && (int) DB::table('bank_receipts')->where('id', $receipt)->value('applied_cents') === 5000
+    && (int) DocumentBalances::portfolio($owner->company_id, 'PEN')->sum('outstanding_cents') === 5000,
+    'One deposit must reduce the portfolio exactly once');
+echo json_encode(['result' => 'PASS', 'same_key' => $same, 'different_keys' => $different, 'same_series' => $series, 'duplicate_jobs' => $jobs, 'publishers' => $publishers, 'numbers' => [1, 2, 3, 4], 'redis_unavailable_then_recovered' => 'PASS', 'duplicate_pdf_workers' => $pdfWorkers, 'overlapping_credits' => $creditRace, 'same_bank_receipt' => $bankRace], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR).PHP_EOL;

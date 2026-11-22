@@ -7,6 +7,7 @@ use App\Models\Company;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\MercadoPagoGateway;
+use App\Services\PaymentReceiver;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -31,7 +32,7 @@ class Subscriptions
         $used = $s ? (int) DB::table('company_usage')->where('subscription_id', $s->id)->value('consumed') : 0;
         $status = $review ? 'review' : (! $s ? (DB::table('subscriptions')->where('company_id', $company)->whereNotNull('ends_at')->exists() ? 'expired' : 'absent') : ($used >= $s->emission_limit ? 'exhausted' : 'active'));
 
-        return ['status' => $status, 'period_id' => $s?->id, 'plan_name' => $s?->plan_name, 'starts_at' => $s?->starts_at, 'ends_at' => $s?->ends_at, 'limit' => $s?->emission_limit ?? 0, 'consumed' => $used, 'remaining' => $s ? max($s->emission_limit - $used, 0) : 0, 'can_issue' => $status === 'active', 'expiring_soon' => $s && CarbonImmutable::parse($s->ends_at)->lte(now()->addDays(3)), 'timezone' => 'America/Lima', 'rule' => 'Una unidad por primera emision registrada, incluidos rechazos. Reintentos no consumen. Borradores disponibles sin vigencia. Notas de credito no habilitadas.'];
+        return ['status' => $status, 'period_id' => $s?->id, 'plan_name' => $s?->plan_name, 'starts_at' => $s?->starts_at, 'ends_at' => $s?->ends_at, 'limit' => $s?->emission_limit ?? 0, 'consumed' => $used, 'remaining' => $s ? max($s->emission_limit - $used, 0) : 0, 'can_issue' => $status === 'active', 'expiring_soon' => $s && CarbonImmutable::parse($s->ends_at)->lte(now()->addDays(3)), 'timezone' => 'America/Lima', 'rule' => 'Una unidad por primera emision registrada, incluidos rechazos. Reintentos no consumen. Borradores disponibles sin vigencia. La misma regla se aplica a las notas de crédito 07.'];
     }
 
     public function consume(Document $doc): void
@@ -79,7 +80,7 @@ class Subscriptions
             if (! $plan) {
                 Collections::error('plan_unavailable', 'Plan no disponible.', 422);
             }
-            if (! MercadoPagoGateway::configured()) {
+            if (! PaymentReceiver::platformReady()) {
                 Collections::error('payments_not_configured', 'Los pagos de prueba no estan configurados.', 503);
             }
             if (DB::table('subscriptions')->where('company_id', $company->id)->where('status', 'review')->exists()) {
@@ -97,9 +98,9 @@ class Subscriptions
                 $last = DB::table('subscriptions')->where('company_id', $company->id)->whereNotNull('starts_at')->orderByDesc('ends_at')->first();
                 DB::table('subscriptions')->insert(['id' => $id, 'company_id' => $company->id, 'plan_code' => $plan->code, 'plan_name' => $plan->name, 'price_cents' => $plan->price_cents, 'currency' => $plan->currency, 'emission_limit' => $plan->emission_limit, 'predecessor_id' => $last?->id, 'created_at' => now(), 'updated_at' => now()]);
                 $order = (string) Str::uuid();
-                DB::table('payment_orders')->insert(['id' => $order, 'company_id' => $company->id, 'document_id' => null, 'subscription_id' => $id, 'requested_by' => $actor->id, 'amount_cents' => $plan->price_cents, 'currency' => $plan->currency, 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('payment_orders')->insert(['id' => $order, 'company_id' => $company->id, 'document_id' => null, 'subscription_id' => $id, 'receiver_kind' => 'platform', 'environment' => 'sandbox', 'collector_id' => (string) config('payments.collector_id'), 'requested_by' => $actor->id, 'amount_cents' => $plan->price_cents, 'currency' => $plan->currency, 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
                 Collections::enqueue('create', $company->id, $order, null, 'create:'.$order);
-                Collections::audit(DB::table('payment_orders')->find($order), null, 'subscription_requested');
+                Collections::audit(DB::table('payment_orders')->find($order), null, 'subscription_requested', actor: $actor->id);
                 $pending = DB::table('subscriptions')->find($id);
             }
             $response = ['data' => ['id' => $pending->id, 'status' => $pending->status, 'order_id' => DB::table('payment_orders')->where('subscription_id', $pending->id)->value('id')]];
@@ -176,7 +177,7 @@ class Subscriptions
             }
             DB::table('subscriptions')->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
             DB::table('payment_orders')->where('id', $order->id)->update(['status' => 'stale', 'updated_at' => now()]);
-            Collections::audit($order, null, 'subscription_cancelled');
+            Collections::audit($order, null, 'subscription_cancelled', actor: $actor->id);
             $response = ['data' => ['id' => $id, 'status' => 'cancelled']];
             DB::table('payment_requests')->insert(['company_id' => $company->id, 'operation' => 'cancel-subscription', 'key' => $key, 'subscription_id' => $id, 'fingerprint' => $fingerprint, 'response' => json_encode($response, JSON_THROW_ON_ERROR), 'created_at' => now()]);
 
@@ -186,20 +187,22 @@ class Subscriptions
 
     public function detail(string $company, ?string $subscriptionId = null): array
     {
+        $configured = PaymentReceiver::platformReady();
         $rows = DB::table('subscriptions')->where('company_id', $company)->when($subscriptionId, fn ($query) => $query->where('id', $subscriptionId))->orderByDesc('created_at')->limit(50)->get();
         foreach ($rows as $s) {
             $s->phase = $s->status !== 'paid' ? $s->status : (now()->lt($s->starts_at) ? 'future' : (now()->gte($s->ends_at) ? 'expired' : 'active'));
             $s->consumed = (int) DB::table('company_usage')->where('subscription_id', $s->id)->value('consumed');
             $o = DB::table('payment_orders')->where('subscription_id', $s->id)->first();
-            $s->order = $o ? ['id' => $o->id, 'status' => $o->status, 'checkout_url' => MercadoPagoGateway::configured() && $this->usage($company)['status'] !== 'review' && $s->status === 'pending' && $o->status === 'open' && now()->lt($o->expires_at) && MercadoPagoGateway::checkoutUrl($o->checkout_url ?? '', $o->preference_id ?? '') ? $o->checkout_url : null, 'error_code' => $o->error_code] : null;
-            $s->verification_error = $o && DB::table('payment_work')->where('order_id', $o->id)->whereIn('status', ['review', 'failed'])->exists();
+            $receiverIssue = $o && $o->receiver_kind === 'legacy' ? 'receiver_unknown' : ($o && $o->collector_id !== (string) config('payments.collector_id') ? 'receiver_mismatch' : null);
+            $s->order = $o ? ['id' => $o->id, 'status' => $o->status, 'checkout_url' => $o->receiver_kind === 'platform' && $o->collector_id === (string) config('payments.collector_id') && $configured && $this->usage($company)['status'] !== 'review' && $s->status === 'pending' && $o->status === 'open' && now()->lt($o->expires_at) && MercadoPagoGateway::checkoutUrl($o->checkout_url ?? '', $o->preference_id ?? '') ? $o->checkout_url : null, 'error_code' => $receiverIssue ?? $o->error_code] : null;
+            $s->verification_error = $o && ($receiverIssue || DB::table('payment_work')->where('order_id', $o->id)->whereIn('status', ['review', 'failed'])->exists());
             if ($s->status === 'pending' && $s->verification_error) {
                 $s->phase = 'verification_error';
             }
             $s->payments = DB::table('payments')->where('subscription_id', $s->id)->get(['provider_id', 'amount_cents', 'applied_cents', 'status', 'needs_review', 'provider_updated_at']);
         }
 
-        return ['usage' => $this->usage($company), 'history' => $rows, 'enabled' => MercadoPagoGateway::configured(), 'pending' => DB::table('payment_work')->where('company_id', $company)->whereIn('order_id', DB::table('payment_orders')->select('id')->whereNotNull('subscription_id'))->whereIn('status', ['pending', 'processing'])->exists()];
+        return ['usage' => $this->usage($company), 'history' => $rows, 'enabled' => $configured, 'pending' => DB::table('payment_work')->where('company_id', $company)->whereIn('order_id', DB::table('payment_orders')->select('id')->whereNotNull('subscription_id'))->whereIn('status', ['pending', 'processing'])->exists()];
     }
 
     public function grantDemo(string $company): array

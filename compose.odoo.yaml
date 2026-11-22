@@ -1,0 +1,36 @@
+# Optional local ERP. Load this override and profile explicitly.
+services:
+  odoo-db:
+    image: postgres:16-bookworm
+    profiles: [odoo]
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${ODOO_LOCAL_DB_PASSWORD:?Define ODOO_LOCAL_DB_PASSWORD para la base local de Odoo}
+    volumes:
+      - odoo_database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  odoo:
+    image: odoo:18.0
+    profiles: [odoo]
+    depends_on:
+      odoo-db:
+        condition: service_healthy
+    environment:
+      HOST: odoo-db
+      USER: odoo
+      PASSWORD: ${ODOO_LOCAL_DB_PASSWORD:?Define ODOO_LOCAL_DB_PASSWORD para la base local de Odoo}
+    ports:
+      - "127.0.0.1:8069:8069"
+    volumes:
+      - odoo_files:/var/lib/odoo
+      - ./integrations/odoo:/mnt/extra-addons:ro
+
+volumes:
+  odoo_database:
+  odoo_files:
+

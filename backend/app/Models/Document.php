@@ -16,7 +16,14 @@ class Document extends Model
 
     protected function casts(): array
     {
-        return ['fiscal_snapshot' => 'array', 'attempt_count' => 'integer', 'can_retry' => 'boolean', 'lease_until' => 'datetime', 'next_attempt_at' => 'datetime', 'version' => 'integer', 'number' => 'integer', 'issue_date' => 'date', 'issued_at' => 'datetime', 'taxable_cents' => 'integer', 'exempt_cents' => 'integer', 'unaffected_cents' => 'integer', 'igv_cents' => 'integer', 'total_cents' => 'integer'];
+        return ['fiscal_snapshot' => 'array', 'attempt_count' => 'integer', 'can_retry' => 'boolean', 'lease_until' => 'datetime', 'next_attempt_at' => 'datetime', 'version' => 'integer', 'number' => 'integer', 'issue_date' => 'date', 'due_date' => 'date', 'issued_at' => 'datetime', 'taxable_cents' => 'integer', 'exempt_cents' => 'integer', 'unaffected_cents' => 'integer', 'igv_cents' => 'integer', 'total_cents' => 'integer'];
+    }
+
+    public function typeLabel(): string
+    {
+        return match ($this->doc_type) {
+            '01' => 'Factura', '03' => 'Boleta', '07' => 'Nota de crédito',
+        };
     }
 
     public function items(): HasMany

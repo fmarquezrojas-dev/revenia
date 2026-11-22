@@ -1,6 +1,6 @@
 # Presentación de Revenia
 
-Revenia es una aplicación de demostración para administrar facturación y cobranza por empresa. Permite preparar comprobantes, emitir mediante un simulador y seguir documentos, entregas y saldos. Combina una API Laravel con una SPA React y procesos asíncronos sobre PostgreSQL y Redis. No acredita clientes comerciales ni integración tributaria real.
+Revenia es una plataforma de facturación y cobranza para empresas. Permite preparar comprobantes, emitir mediante un simulador y seguir documentos, entregas y saldos. Combina una API Laravel con una SPA React y procesos asíncronos sobre PostgreSQL y Redis. No acredita clientes comerciales ni integración tributaria real.
 
 ## Competencias demostradas
 

@@ -5,6 +5,7 @@ use App\Models\DocumentSeries;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\MerchantAccount;
 
 require __DIR__.'/bootstrap.php';
 if (Artisan::call('migrate', ['--force' => true, '--no-interaction' => true]) !== 0) {
@@ -15,6 +16,7 @@ if (DB::table('companies')->exists()) {
 }
 DB::table('plans')->where('code', 'demo-basic')->update(['emission_limit' => 2]);
 $company = Company::factory()->create(['legal_name' => 'E2E Compania Pena y Nunez', 'ruc' => '20131312955']);
+MerchantAccount::create($company->id);
 foreach (['owner', 'issuer', 'accountant'] as $role) {
     User::factory()->for($company)->create(['name' => 'E2E '.$role, 'email' => $role.'@integral.test', 'role' => $role, 'password' => 'Integral-Test-Only-123']);
 }

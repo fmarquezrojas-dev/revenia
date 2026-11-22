@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Delivery\DocumentDelivery;
+use App\Actions\Odoo\OdooTransfers;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('issuance:tick')->everyMinute();
+Schedule::call(fn () => OdooTransfers::tick())->name('odoo:publish')->everyMinute()->withoutOverlapping();
 
 Artisan::command('delivery:clean-orphans', function (): void {
     $this->info('Removed: '.app(DocumentDelivery::class)->cleanOrphans());

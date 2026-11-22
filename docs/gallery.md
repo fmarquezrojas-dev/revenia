@@ -1,20 +1,24 @@
-# Galeria real
+# Galería histórica de Revenia
 
-Capturas obtenidas del navegador contra la aplicacion con datos sinteticos. No son maquetas. Las cifras corresponden al recorrido E2E y no a ventas comerciales.
+Estas capturas corresponden a una versión anterior. Conservan textos, navegación y datos de ese momento. La versión actual incorpora Cobros, el seguimiento de conciliaciones y las condiciones de pago.
 
-## Dashboard
+## Resumen
 ![Dashboard](images/dashboard.png)
 
-## Editor
+## Comprobantes · Editor
 ![Editor de comprobante](images/editor.png)
 
-## Documento aceptado
+## Comprobantes · Detalle
 ![Detalle del documento](images/documento.png)
 
 ## Plan y consumo
 ![Plan](images/plan.png)
 
-## Vista movil
+## Resumen en móvil
 ![Dashboard movil](images/movil.png)
 
-[PDF sintetico generado por Revenia](examples/revenia-invoice.pdf): muestra expresa para revision publica, con aviso de simulacion. No es un PDF operativo privado. No se incluye captura de nota de credito porque ese modulo no existe.
+[PDF sintetico generado por Revenia](examples/revenia-invoice.pdf): muestra expresa para revision publica, con aviso de simulacion. No es un PDF operativo privado. La plantilla actual identifica «Emisión tributaria simulada».
+
+## Resumen con notas de crédito
+
+![Resumen histórico con notas de crédito aceptadas](images/nota-credito-dashboard.png)
