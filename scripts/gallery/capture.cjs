@@ -26,7 +26,11 @@ async function main() {
       await page.goto(base + route, { waitUntil: 'networkidle' })
       await page.locator('.user-menu').waitFor()
       await page.evaluate(() => document.fonts.ready)
-      if (open) await page.getByRole('button', { name: open, exact: true }).click()
+      if (open) {
+        await page.getByRole('button', { name: open, exact: true }).click()
+        await page.getByRole('textbox', { name: 'Aplicar a FR01-00000001', exact: true }).fill('20.00')
+        await page.getByRole('button', { name: 'Confirmar distribución' }).waitFor()
+      }
       if (target) {
         const section = page.locator(target).first()
         await section.waitFor({ state: 'visible' })
