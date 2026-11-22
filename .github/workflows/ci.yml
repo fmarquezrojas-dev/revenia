@@ -108,6 +108,16 @@ jobs:
           test "$(docker compose exec -T db psql -U facturly -d facturly -Atqc 'select count(*) from migrations')" -eq "$(find backend/database/migrations -name '*.php' | wc -l)"
           docker compose exec -T app php scripts/prepare-demo.php
           python3 scripts/verify-demo-install.py
+      - name: Capturar el recorrido con datos sintéticos
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/gallery-tools" --no-save --ignore-scripts playwright-core@1.56.1
+          NODE_PATH="$RUNNER_TEMP/gallery-tools/node_modules" node scripts/gallery/capture.cjs
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && always()
+        with:
+          name: revenia-gallery
+          path: ${{ runner.temp }}/revenia-gallery/*.png
       - name: Retirar la instalación del runner
         if: always()
         run: docker compose down --volumes
