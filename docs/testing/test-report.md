@@ -1,10 +1,20 @@
-# Verificacion del alcance de portafolio
+# Informe de verificación de Revenia
+
+## Mantenimiento de las consultas locales · 22 de noviembre de 2026
+
+En un runner aislado con PostgreSQL, la suite de mantenimiento pasó **408 pruebas y 2.295 aserciones**. Los tres casos de `BusinessMcpTest` reunieron 55 aserciones. Cubrieron las tres lecturas, la separación PEN/USD, el permiso del usuario, el rechazo de una credencial vencida y la respuesta indistinguible ante un comprobante ajeno o inexistente. Se probó la lectura con una credencial sintética en el formato de la candidata publicada y su revocación mediante `revenia:mcp-access`. [Resultados de backend](https://github.com/fmarquezrojas-dev/revenia/actions/runs/45083884215) · [Pruebas específicas](../../backend/tests/Feature/BusinessMcpTest.php)
+
+Una instalación temporal comprobó el protocolo por entrada y salida estándar. `initialize` negoció la versión 2025-03-26, `tools/list` devolvió las tres herramientas y una llamada sin credencial recibió acceso denegado. Windows resolvió la ruta absoluta del lanzador en la configuración personal. Los identificadores persistidos de Sanctum y la ruta cifrada por usuario y copia se conservan para que las autorizaciones anteriores puedan utilizarse, vencer y revocarse.
+
+Composer eliminó dos dependencias de desarrollo directas y cuatro transitivas exclusivas. Los 87 paquetes de ejecución conservaron versión y referencia. Laravel MCP sigue como dependencia directa. Pasaron la validación estricta del manifiesto, la instalación y la auditoría. La instalación del runner utilizó Linux y las extensiones de la aplicación.
+
+La ficha 1.5.1 conserva 12 tablas editables, el índice enlazado y 14 páginas. La revisión comprobó texto, encabezados, pies, propiedades, diagrama y destinos de enlace en Word y PDF. La edición original 1.5 se conserva en el tag de publicación. [Ficha revisada](../ficha/Revenia-v1.5.1.pdf)
 
 ## Bloque 12 · instalación pública y documentación
 
 La huella de los 470 archivos de la candidata coincidió con la registrada en el bloque 11 antes del cierre editorial. El commit `c7622aff0ef12da80e310716f98897c68899cbbe` reúne esos cambios y el informe. La instalación pública se ejecutó desde un checkout nuevo en un runner desechable de GitHub, con los archivos de bloqueo de la candidata y 23 migraciones. Se comprobó el acceso por sesión, cartera, agenda, Tesorería, Incidencias, suscripción, Estado de cuenta y el conector Odoo desactivado. [Ejecución de instalación y suites en la rama de entrega](https://github.com/fmarquezrojas-dev/revenia/actions/runs/44974842465).
 
-La primera comprobación HTTP solicitaba JSON al cargar la página HTML de Vite. Se corrigió la cabecera del verificador y se repitió la instalación completa. La edición técnica 1.5 contiene 12 capítulos con índice enlazado, 12 tablas editables y 14 páginas en el PDF. Los resultados de CI de cada revisión se consultan por SHA. [Workflow](../../.github/workflows/ci.yml) · [Ficha PDF](../ficha/Revenia-v1.5.pdf)
+La primera comprobación HTTP solicitaba JSON al cargar la página HTML de Vite. Se corrigió la cabecera del verificador y se repitió la instalación completa. La edición técnica 1.5 contiene 12 capítulos con índice enlazado, 12 tablas editables y 14 páginas en el PDF. Los resultados de CI de cada revisión se consultan por SHA. [Workflow](../../.github/workflows/ci.yml) · [Ficha PDF del ensayo original](https://github.com/fmarquezrojas-dev/revenia/releases/download/v0.1.0-rc.2/Revenia-v1.5.pdf)
 
 En una ejecución intermedia el navegador E2E llegó a `/acceso` con el cuerpo vacío y agotó la espera. El contenedor E2E sirve ahora el frontend compilado por la propia prueba mediante `vite preview`. El job de instalación limpia sigue verificando el servidor de desarrollo que utiliza el operador. [Ejecución intermedia](https://github.com/fmarquezrojas-dev/revenia/actions/runs/44976074982)
 
@@ -14,7 +24,7 @@ El job manual `clean-install` preparó una empresa sintética en Compose y captu
 
 ## Bloque 11 · validación de la candidata del 21 de noviembre de 2026
 
-**Decisión: lista con limitaciones documentadas.** El ensayo cubrió PostgreSQL, la recuperación con PDF privados, la cobranza entre módulos y el conector contra Odoo Community. Quedan pendientes Mercado Pago en su sandbox externo y la aceptación del operador con sus usuarios, datos y claves. La emisión fue simulada. La publicación en GitHub corresponde al bloque 12.
+**Decisión: lista con limitaciones documentadas.** El ensayo cubrió PostgreSQL, la recuperación con PDF privados, la cobranza entre módulos y el conector contra Odoo Community. Quedan pendientes Mercado Pago en su sandbox externo y la aceptación del operador con sus usuarios, datos y claves. La emisión fue simulada. La [publicación de la candidata](https://github.com/fmarquezrojas-dev/revenia/releases/tag/v0.1.0-rc.2) conserva el código de ese ensayo.
 
 ### Código y aislamiento
 
@@ -94,7 +104,7 @@ Los comandos de contenedor de la tabla se ejecutaron mediante `docker exec` diri
 
 1. Custodiar la `APP_KEY` original, respaldar la instalación antes de migrarla y restaurar el paquete propio en una instancia vacía. Comparar las empresas, saldos y PDF que conoce.
 2. Elegir un cliente por moneda. Contrastar detalle, cartera, estado de cuenta e impresión antes y después de distribuir y revertir un abono de prueba. Verificar remanente, vencimiento y tratamiento de una nota de crédito.
-3. Probar dueño, emisor y contador con cuentas propias, incluida una empresa distinta. Revisar agenda, asignación, impresión e incidencias. Autorizar y revocar una credencial local de Codex.
+3. Probar dueño, emisor y contador con cuentas propias, incluida una empresa distinta. Revisar agenda, asignación, impresión e incidencias. Autorizar y revocar una credencial de lectura de cobranza.
 4. Si utilizará Mercado Pago, comprobar el sandbox externo con sus credenciales y notificaciones de prueba. Si utiliza Odoo, validar compañía, correspondencias contables y revisión de borradores en su instalación. La prueba real de Odoo se circunscribió al laboratorio.
 
 ## Bloque comercial de notas 07 · 20 de noviembre de 2026

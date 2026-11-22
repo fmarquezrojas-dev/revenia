@@ -1,5 +1,11 @@
 # Historial de cambios
 
+## Mantenimiento posterior a v0.1.0-rc.2
+
+- La ficha técnica 1.5.1 y la guía describen las consultas locales de cobranza, sus permisos y la revocación.
+- El lanzador genérico se encuentra en `scripts/mcp/revenia.ps1`. La configuración de clientes se mantiene en cada equipo. Los perfiles locales y las credenciales vigentes conservan su validez.
+- Se retiraron dos herramientas de desarrollo sin uso y sus dependencias exclusivas. Las versiones de las dependencias de ejecución se conservan.
+
 ## v0.1.0-rc.2 · candidata de cobranza
 
 - El estado de cuenta enlaza facturas, notas, pagos, aplicaciones y reversiones. Los saldos actuales se consultan e imprimen por cliente y moneda.
