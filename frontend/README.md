@@ -1,4 +1,4 @@
-# Interfaz Facturly
+# Interfaz Revenia
 
 Desde la raíz del repositorio:
 

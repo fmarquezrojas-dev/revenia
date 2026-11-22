@@ -1,6 +1,15 @@
 # Historial de cambios
 
-## Sin release estable
+## v0.1.0-rc.2 · candidata de cobranza
+
+- El estado de cuenta enlaza facturas, notas, pagos, aplicaciones y reversiones. Los saldos actuales se consultan e imprimen por cliente y moneda.
+- Cuentas por cobrar incorpora seguimiento, compromisos, responsables y agendas. Tesorería registra abonos e identifica remanentes.
+- Incidencias, MCP, Odoo en borrador y el respaldo aislado completan el circuito operativo. Se incorporan siete migraciones sobre la base de 16.
+- Se verificaron las carreras de créditos y dinero, la recuperación con respuesta perdida y la restauración sintética. La edición documental v1.5 incluye Word, PDF y la guía visual. [Notas de la candidata](docs/release-notes.md) · [Evidencia](docs/testing/test-report.md)
+
+La guía visual incluye 35 vistas de la interfaz y tres imágenes de documentos y resultados del laboratorio. [Recorrido por funcionalidad](README.md#guía-visual-por-tarea)
+
+## Antecedente de portafolio
 
 ### Preparacion de portafolio
 

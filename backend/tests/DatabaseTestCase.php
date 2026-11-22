@@ -11,6 +11,11 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function beforeRefreshingDatabase(): void
     {
+        self::requireTestDatabase();
+    }
+
+    public static function requireTestDatabase(): void
+    {
         if (
             ! app()->environment('testing')
             || config('database.default') !== 'pgsql'

@@ -3,14 +3,14 @@ import type { FormEvent } from 'react'
 import { ApiError } from '../lib/api'
 import type { Customer, Product } from '../lib/api'
 import { documentError, getSeriesOptions, limaToday, lineFromProduct, normalizeQuantity, previewDocument, saveDocument } from '../lib/documents'
-import type { DraftDocument, DraftInput, DraftLine, Preview, SeriesOption } from '../lib/documents'
+import type { DraftDocument, DraftInput, DraftLine, PaymentTerms, Preview, SeriesOption } from '../lib/documents'
 import { useFormGuard } from '../app/FormGuard'
 import { centsToDecimal, taxLabels } from '../lib/money'
 import DocumentLookup from './DocumentLookup'
 import DocumentTotals from './DocumentTotals'
 interface Props { document?: DraftDocument; onSaved:(doc:DraftDocument)=>void; onCancel:()=>void; onReload:()=>void; onSessionExpired:()=>void; onSavingChange:(value:boolean)=>void }
 export default function DocumentEditor({document: draft,onSaved,onCancel,onReload,onSessionExpired,onSavingChange}:Props) {
- const [header,setHeader]=useState({doc_type:draft?.doc_type??'01',currency:draft?.currency??'PEN',issue_date:draft?.issue_date??limaToday(),customer_id:draft?.customer_id??null,series_id:draft?.series_id??''})
+ const [header,setHeader]=useState({payment_terms:draft ? (draft.payment_terms ?? '') : 'cash',due_date:draft?.due_date ?? '',doc_type:draft?.doc_type??'01',currency:draft?.currency??'PEN',issue_date:draft?.issue_date??limaToday(),customer_id:draft?.customer_id??null,series_id:draft?.series_id??''})
  const [customer,setCustomer]=useState(draft?.customer??null)
  const [lines,setLines]=useState<DraftLine[]>(draft?.items??[])
  const [series,setSeries]=useState<{type:string;rows:SeriesOption[]}>({type:'',rows:[]})
@@ -30,7 +30,12 @@ export default function DocumentEditor({document: draft,onSaved,onCancel,onReloa
   if(!items.length)fields.items=['Agrega al menos un producto.']
   if(!header.series_id)fields.series_id=['Selecciona una serie.']
   if(header.doc_type==='01'&&!header.customer_id)fields.customer_id=['Selecciona un cliente con RUC.']
-  return {data:{...header,...(draft?{version:draft.version}:{}),items} as DraftInput,fields}
+  const {payment_terms, due_date, ...documentHeader} = header
+  if (payment_terms === 'credit' && (!due_date || due_date < header.issue_date)) {
+   fields.due_date = ['Indica un vencimiento igual o posterior a la emisión.']
+  }
+  const terms = payment_terms ? {payment_terms: payment_terms as PaymentTerms} : {}
+  return {data:{...documentHeader,...terms,...(payment_terms === 'credit' ? {due_date} : {}),...(draft?{version:draft.version}:{}),items} as DraftInput,fields}
  },[header,lines,draft])
  const key=JSON.stringify(payload.data)
  useEffect(()=>{
@@ -81,10 +86,17 @@ export default function DocumentEditor({document: draft,onSaved,onCancel,onReloa
  <div><label htmlFor="document-type">Tipo de comprobante</label><select id="document-type" value={header.doc_type} onChange={e=>{const type=e.target.value as '01'|'03';if(header.series_id&&!window.confirm('Cambiar el tipo requiere seleccionar otra serie. Las lineas se conservaran.'))return;setHeader({...header,doc_type:type,series_id:''});setErrors({})}}><option value="01">Factura</option><option value="03">Boleta</option></select>{fieldError('doc_type')}</div>
  <div><label htmlFor="document-currency">Moneda</label><select id="document-currency" value={header.currency} onChange={e=>{if(lines.length&&!window.confirm('Las lineas se conservaran. Reemplaza los productos que no correspondan a la nueva moneda; no hay conversion automatica.'))return;setHeader({...header,currency:e.target.value as 'PEN'|'USD'});setErrors({})}}><option>PEN</option><option>USD</option></select>{fieldError('currency')}</div>
  <div><label htmlFor="document-date">Fecha (Lima)</label><input id="document-date" type="date" max={limaToday()} value={header.issue_date} onChange={e=>{setHeader({...header,issue_date:e.target.value});setErrors({})}} aria-invalid={Boolean(allErrors.issue_date)} aria-describedby="error-issue_date"/>{fieldError('issue_date')}</div>
+ <div><label htmlFor="document-terms">Condición de pago</label>
+ <select id="document-terms" value={header.payment_terms} aria-invalid={Boolean(allErrors.payment_terms)} aria-describedby="error-payment_terms"
+ onChange={e=>{setHeader({...header,payment_terms:e.target.value});setErrors({})}}>
+ {draft&&!draft.payment_terms&&<option value="">Sin vencimiento informado</option>}<option value="cash">Contado</option><option value="credit">Crédito</option></select>{fieldError('payment_terms')}</div>
+ <div><label htmlFor="document-due">Vencimiento</label><input id="document-due" type="date" readOnly={header.payment_terms!=='credit'}
+ value={header.payment_terms==='cash'?header.issue_date:header.payment_terms==='credit'?header.due_date:''} min={header.issue_date}
+ onChange={e=>{setHeader({...header,due_date:e.target.value});setErrors({})}} aria-invalid={Boolean(allErrors.due_date)} aria-describedby="error-due_date"/>{fieldError('due_date')}</div>
  <div><label htmlFor="document-series">Serie</label><select id="document-series" value={header.series_id} onChange={e=>{setHeader({...header,series_id:e.target.value});setErrors({})}} aria-invalid={Boolean(allErrors.series_id)} aria-describedby="error-series_id"><option value="">Seleccionar serie activa</option>{draft?.series_id===header.series_id&&!series.rows.some(s=>s.id===header.series_id)&&<option value={header.series_id}>{draft.series.code} (revisar disponibilidad)</option>}{series.type===header.doc_type&&series.rows.map(s=><option key={s.id} value={s.id}>{s.code}</option>)}</select>{fieldError('series_id')}</div>
  <div className="document-customer"><h3>Cliente</h3><p>{customer?`${customer.name} - ${customer.doc_number}`:'Sin cliente identificado'}</p>{customer&&!customer.is_active&&<p className="error">Cliente inactivo: reemplazalo para guardar.</p>}{header.doc_type==='01'&&customer&&customer.doc_type!=='ruc'&&<p className="error">La factura requiere un cliente con RUC.</p>}
  <button type="button" className="secondary" onClick={()=>setLookup('customer')}>Seleccionar cliente</button>{header.doc_type==='03'&&<button type="button" className="secondary" onClick={()=>{setCustomer(null);setHeader({...header,customer_id:null});setErrors({})}}>Sin cliente identificado</button>}{fieldError('customer_id')}
- <p className="muted">Politica del simulador: una boleta PEN puede ser anonima dentro del umbral configurado. En USD se requiere identificacion. El servidor valida estas condiciones.</p></div>
+ <p className="muted">Una boleta en PEN puede ser anónima dentro del límite configurado. En USD se requiere identificación.</p></div>
  </fieldset>
  <fieldset disabled={saving}><legend>Productos y servicios ({lines.length}/50)</legend>
  {lines.map((line,index)=><article className="document-line" key={line.id??line.product_id}><div><h3>{index+1}. {line.description}</h3><p className="muted">{centsToDecimal(line.unit_price_cents)} {line.currency??draft?.currency??header.currency} sin IGV - {line.unit_code} - {taxLabels[line.tax_type as keyof typeof taxLabels]}</p>

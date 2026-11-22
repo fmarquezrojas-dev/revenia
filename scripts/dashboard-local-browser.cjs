@@ -87,7 +87,7 @@ async function main(){
 
  await waitText('Cartera actual');assert.equal(await evaluate('location.pathname'),'/dashboard');
  const dashboard=(await api('dashboard')).json.data;
- assert.equal(dashboard.activity.collected_cents,'0');assert.equal(dashboard.activity.credit_notes_supported,false);assert.equal(dashboard.usage.consumed,6);
+ assert.equal(dashboard.activity.collected_cents,'0');assert.equal(dashboard.activity.credit_notes_supported,true);assert.equal(dashboard.usage.consumed,6);
  const details=(await api('dashboard?metric=accepted')).json.data.detail;
  assert.equal(details.rows.reduce((sum,row)=>sum+BigInt(row.amount_cents),0n).toString(),dashboard.activity.accepted_cents);
  report.metrics={currency:dashboard.currency,period:dashboard.period,activity:dashboard.activity,portfolio:dashboard.portfolio};

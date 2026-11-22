@@ -7,16 +7,19 @@ Docker con Compose y PowerShell. PHP 8.4, PostgreSQL 17, Redis 7.4 y Node 22 se 
 Ejecutar desde una copia nueva:
 
 ```powershell
+# Una sola vez en el clon nuevo. Compose recordará su proyecto en esta carpeta.
+Set-Content -Path .env -Encoding ascii -Value ("COMPOSE_PROJECT_NAME=revenia-eval-" + [guid]::NewGuid().ToString("N").Substring(0,8))
 Copy-Item backend/.env.example backend/.env
 docker compose build
-docker compose up -d db redis mailpit
+docker compose up -d --wait db redis mailpit
 docker compose run --rm --no-deps -e COMPOSER_PROCESS_TIMEOUT=1200 app composer install --no-interaction --prefer-dist
 docker compose run --rm --no-deps app php artisan key:generate
 docker compose run --rm --no-deps frontend npm ci --ignore-scripts
 docker compose run --rm --no-deps app php artisan migrate --force
 docker compose up -d
-docker compose exec -T app php scripts/prepare-demo.php
 ```
+
+Para evaluar una copia **nueva y desechable**, ejecute después `docker compose exec -T app php scripts/prepare-demo.php`. Ingrese con una de las [cuentas sintéticas](DATOS_LOCALES.md). La instalación limpia se comprueba en el job `clean-install` del [workflow](../.github/workflows/ci.yml).
 
 La copia de .env y generacion de APP_KEY son exclusivas de la primera instalacion. Las credenciales Compose y del seeder son publicas, sinteticas y solo para desarrollo local. Los puertos se vinculan a localhost. No reutilizarlas para publicar una instancia.
 
@@ -28,13 +31,13 @@ Worker y scheduler se incorporan mediante compose.override.yaml. Todos montan ba
 
 Reinicio: `docker compose up -d`. Detener sin borrar datos: `docker compose stop`. No regenerar APP_KEY. No usar migrate:fresh, db:wipe ni down -v como arranque normal.
 
-Actualizar una copia existente: conservar .env; instalar Composer/npm desde lockfiles; ejecutar `php artisan migrate --force`; reconstruir frontend si se usa dist y recrear worker/scheduler para cargar codigo nuevo con los mismos prefijos. Antes de migraciones en una instancia con datos propios se requiere una copia de seguridad y revision del cambio.
+Actualizar una copia existente: conservar .env; instalar Composer/npm desde lockfiles; revisar `php artisan migrate:status` y ejecutar `php artisan migrate --force`; reconstruir frontend si se usa dist y recrear worker/scheduler para cargar codigo nuevo con los mismos prefijos. Antes de migrar datos propios, siga [Respaldo y restauración](RESPALDO_Y_RESTAURACION.md). En la candidata hay 23 migraciones, siete posteriores al esquema base.
 
 ```powershell
 docker compose exec -T app composer install --no-interaction --prefer-dist
 docker compose exec -T frontend npm ci --ignore-scripts
 docker compose exec -T app php artisan migrate --force
-docker compose restart worker scheduler
+docker compose up -d --build --force-recreate app worker scheduler
 ```
 
 ## Pagos y demo

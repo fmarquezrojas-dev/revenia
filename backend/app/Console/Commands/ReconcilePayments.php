@@ -17,7 +17,7 @@ class ReconcilePayments extends Command
 
     public function handle(PaymentWork $worker): int
     {
-        if (! MercadoPagoGateway::configured()) {
+        if (! MercadoPagoGateway::transportReady()) {
             $this->warn('Mercado Pago de pruebas deshabilitado o incompleto.');
 
             return self::SUCCESS;
@@ -53,10 +53,10 @@ class ReconcilePayments extends Command
                 if ($work->kind === 'create') {
                     Collections::enqueue('reconcile', $company, $work->order_id, null, 'operator:'.Str::uuid());
                 } else {
-                    Collections::enqueue($work->kind, $company, $work->order_id, $work->payment_id, 'operator:'.Str::uuid());
+                    Collections::enqueue($work->kind, $company, $work->order_id, $work->payment_id, 'operator:'.Str::uuid(), $work->event_id, $work->webhook_scope, $work->connection_id, $work->webhook_collector_id);
                 }
             } else {
-                $orders = DB::table('payment_orders')->where('company_id', $company)->when($this->option('order'), fn ($q) => $q->where('id', $this->option('order')))->where(fn ($q) => $q->whereNull('last_reconciled_at')->orWhere('last_reconciled_at', '<', now()->subMinute()))->orderBy('created_at')->limit($limit)->get();
+                $orders = DB::table('payment_orders')->where('company_id', $company)->where('receiver_kind', '<>', 'legacy')->when($this->option('order'), fn ($q) => $q->where('id', $this->option('order')))->where(fn ($q) => $q->whereNull('last_reconciled_at')->orWhere('last_reconciled_at', '<', now()->subMinute()))->orderBy('created_at')->limit($limit)->get();
                 foreach ($orders as $o) {
                     DB::table('payment_orders')->where('id', $o->id)->update(['last_reconciled_at' => now()]);
                     Collections::enqueue('reconcile', $company, $o->id, null, 'operator:'.Str::uuid());

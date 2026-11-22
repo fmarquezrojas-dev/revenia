@@ -4,12 +4,20 @@ use App\Actions\Payments\Collections;
 use App\Actions\Payments\PaymentWork;
 use App\Contracts\PaymentGateway;
 use App\Models\User;
+use App\Services\PaymentReceiver;
 use Illuminate\Support\Facades\DB;
 
 $c = require __DIR__.'/bootstrap.php';
 config(['payments.enabled' => true, 'payments.access_token' => 'synthetic-token-not-real', 'payments.collector_id' => '123', 'payments.webhook_secret' => 'synthetic-webhook-secret', 'payments.notification_url' => 'https://demo.example.test/webhook', 'payments.return_origin' => 'https://demo.example.test']);
-app()->instance(PaymentGateway::class, new class implements PaymentGateway
+app()->instance(PaymentGateway::class, new class($argv[1]) implements PaymentGateway
 {
+    public function __construct(private string $action) {}
+
+    public function forReceiver(PaymentReceiver $receiver): PaymentGateway
+    {
+        return $this;
+    }
+
     private function outside(): void
     {
         if (DB::transactionLevel() !== 0) {
@@ -20,6 +28,10 @@ app()->instance(PaymentGateway::class, new class implements PaymentGateway
     public function create(object $o): array
     {
         $this->outside();
+        DB::table('test_remote_preferences')->insert(['order_id' => $o->id]);
+        if ($this->action === 'interrupt-create') {
+            exit(73);
+        }
         usleep(150000);
 
         return ['id' => '123-test', 'url' => 'https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=123-test'];
@@ -29,7 +41,9 @@ app()->instance(PaymentGateway::class, new class implements PaymentGateway
     {
         $this->outside();
 
-        return null;
+        return DB::table('test_remote_preferences')->where('order_id', $o->id)->exists()
+            ? ['id' => '123-test', 'url' => 'https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=123-test']
+            : null;
     }
 
     public function paymentIds(object $o): array
@@ -44,12 +58,12 @@ app()->instance(PaymentGateway::class, new class implements PaymentGateway
         $this->outside();
         $o = DB::table('payment_orders')->first();
 
-        return ['id' => $id, 'collector_id' => '123', 'external_reference' => $o->id, 'preference_id' => '123-test', 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => '11.80', 'transaction_amount_refunded' => '0', 'status' => 'approved', 'date_last_updated' => '2026-11-13T10:00:00Z'];
+        return ['id' => $id, 'collector_id' => $o->collector_id, 'external_reference' => $o->id, 'preference_id' => '123-test', 'live_mode' => false, 'currency_id' => 'PEN', 'transaction_amount' => '11.80', 'transaction_amount_refunded' => '0', 'status' => 'approved', 'date_last_updated' => '2026-11-13T10:00:00Z'];
     }
 });
 [$script,$action,$actor,$document,$key,$directory,$index] = $argv;
 $pid = DB::selectOne('SELECT pg_backend_pid() AS pid')->pid;
-touch($directory.'/ready-'.$index);
+file_put_contents($directory.'/ready-'.$index, (string) $pid);
 $deadline = microtime(true) + 120;
 while (! file_exists($directory.'/go')) {
     if (microtime(true) > $deadline) {

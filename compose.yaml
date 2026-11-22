@@ -2,6 +2,7 @@ name: facturly
 
 services:
   app:
+    init: true
     build:
       context: .
       dockerfile: deploy/docker/php.dev.Dockerfile

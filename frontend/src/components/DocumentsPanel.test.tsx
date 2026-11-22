@@ -3,12 +3,13 @@ import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { render } from '../test/render'
+import CreditNotePanel from './CreditNotePanel'
 import DocumentEditor from './DocumentEditor'
 import DocumentsPanel from './DocumentsPanel'
 import { ApiError, getProducts, getCustomers } from '../lib/api'
-import { getDocuments, getDocument, getSeriesOptions, previewDocument, saveDocument, deleteDocument, normalizeQuantity } from '../lib/documents'
+import { getDocuments, getDocument, getSeriesOptions, previewDocument, saveDocument, deleteDocument, normalizeQuantity, createCreditNote } from '../lib/documents'
 import type { DraftDocument, Preview } from '../lib/documents'
-vi.mock('../lib/documents',async original=>({...await original<typeof import('../lib/documents')>(),getDocuments:vi.fn(),getDocument:vi.fn(),getSeriesOptions:vi.fn(),previewDocument:vi.fn(),saveDocument:vi.fn(),deleteDocument:vi.fn()}))
+vi.mock('../lib/documents',async original=>({...await original<typeof import('../lib/documents')>(),createCreditNote:vi.fn(),getDocuments:vi.fn(),getDocument:vi.fn(),getSeriesOptions:vi.fn(),previewDocument:vi.fn(),saveDocument:vi.fn(),deleteDocument:vi.fn()}))
 vi.mock('../lib/api',async original=>({...await original<typeof import('../lib/api')>(),getCustomers:vi.fn(),getProducts:vi.fn()}))
 const totals={taxable_cents:3000,exempt_cents:0,unaffected_cents:0,igv_cents:540,total_cents:3540}
 const draft:DraftDocument={id:'doc',doc_type:'01',currency:'PEN',issue_date:'2026-01-01',status:'draft',number:null,version:1,customer_id:'customer',series_id:'series',customer:{id:'customer',name:'Cliente ensayo',doc_type:'ruc',doc_number:'20131312955',is_active:true},series:{id:'series',code:'F001',doc_type:'01',is_active:true},items:[{id:'line',product_id:'product',description:'Producto ensayo',unit_price_cents:1000,unit_code:'NIU',tax_type:'10',quantity:'3.000',product_is_active:true,product_currency:'PEN',base_cents:3000,igv_cents:540,total_cents:3540}],totals}
@@ -24,6 +25,23 @@ beforeEach(()=>{
  vi.mocked(getProducts).mockResolvedValue({data:[],meta:{current_page:1,last_page:1,per_page:15,total:0}})
  vi.mocked(getCustomers).mockResolvedValue({data:[],meta:{current_page:1,last_page:1,per_page:15,total:0}})
  vi.spyOn(window,'confirm').mockReturnValue(true)
+})
+it('prepara la devolución completa de una línea con vista previa de exceso', async () => {
+ const user = userEvent.setup(), saved = vi.fn()
+ const doc = {...draft, items:[{...draft.items[0], id:'a', description:'Equipo', total_cents:94400},
+   {...draft.items[0], id:'b', description:'Accesorio', total_cents:23600}]}
+ const credit = {balance:{net_cents:118000,paid_cents:'100000'},notes:[],states:{a:'reserved' as const},series:[{id:'fc',code:'FC01'}]}
+ vi.mocked(createCreditNote).mockResolvedValue({...draft,doc_type:'07'})
+ render(<CreditNotePanel doc={doc} credit={credit} canWrite onSaved={saved} onSessionExpired={vi.fn()}/>)
+ await user.click(screen.getByRole('button',{name:'Crear nota de crédito'}))
+ expect(screen.getByRole('checkbox',{name:/Equipo.*Reservada/})).toBeDisabled()
+ await user.click(screen.getByRole('checkbox',{name:/Accesorio.*Disponible/}))
+ expect(screen.getByText('Exceso por revisar').nextElementSibling).toHaveTextContent('PEN 56.00')
+ expect(screen.getByText('Neto de la venta').nextElementSibling).toHaveTextContent('PEN 944.00')
+ await user.type(screen.getByLabelText('Motivo de devolución'),'Devolución')
+ await user.click(screen.getByRole('button',{name:'Guardar nota en borrador'}))
+ expect(createCreditNote).toHaveBeenCalledWith('doc',{series_id:'fc',reason:'Devolución',item_ids:['b']})
+ expect(saved).toHaveBeenCalled()
 })
 it.each(['owner','issuer','accountant'] as const)('muestra permisos del listado para %s',async role=>{
  render(<DocumentsPanel role={role} onSessionExpired={vi.fn()} onSavingChange={vi.fn()}/>, '/documents')

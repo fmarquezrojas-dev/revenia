@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Documents\CreditNotes;
 use App\Actions\Documents\DraftDocuments;
 use App\Http\Requests\SaveDocumentRequest;
 use App\Http\Resources\DocumentResource;
@@ -18,7 +19,7 @@ class DocumentController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         Gate::authorize('viewAny', Document::class);
-        $f = $request->validate(['doc_type' => ['sometimes', 'in:01,03'], 'status' => ['sometimes', 'in:draft,issued,queued,sending,accepted,rejected,failed'], 'customer_id' => ['sometimes', 'uuid'],
+        $f = $request->validate(['doc_type' => ['sometimes', 'in:01,03,07'], 'status' => ['sometimes', 'in:draft,issued,queued,sending,accepted,rejected,failed'], 'customer_id' => ['sometimes', 'uuid'],
             'date_from' => ['sometimes', 'date_format:Y-m-d'], 'date_to' => ['sometimes', 'date_format:Y-m-d', ...($request->filled('date_from') ? ['after_or_equal:date_from'] : [])],
             'page' => ['sometimes', 'integer', 'min:1'], 'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'], 'company_id' => ['missing']]);
         $q = Document::where('company_id', $request->user()->company_id)->with(['items.product', 'customer', 'series']);
@@ -48,6 +49,16 @@ class DocumentController extends Controller
     public function store(SaveDocumentRequest $request, DraftDocuments $action): JsonResponse
     {
         return (new DocumentResource($action->save($request->user(), $request->validated())))->response()->setStatusCode(201);
+    }
+
+    public function creditNote(Request $request, string $documentId, CreditNotes $notes): JsonResponse
+    {
+        Gate::authorize('create', Document::class);
+        $data = $request->validate(['series_id' => 'required|uuid', 'reason' => 'required|string|max:250',
+            'item_ids' => 'required|array|list|min:1|max:50', 'item_ids.*' => 'required|uuid|distinct:ignore_case']);
+        abort_if(array_diff(array_keys($request->all()), array_keys($data)), 422, 'Solo se admiten serie, motivo y líneas originales.');
+
+        return (new DocumentResource($notes->draft($request->user(), $documentId, $data)))->response()->setStatusCode(201);
     }
 
     public function update(SaveDocumentRequest $request, string $documentId, DraftDocuments $action): DocumentResource

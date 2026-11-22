@@ -1,9 +1,9 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Facturly - Catalogos, Borradores y Emision simulada",
-    "version": "1.7.0",
-    "description": "Catalogos y comprobantes 01/03 con importes enteros, numeracion transaccional, idempotencia, outbox y proveedor simulado. Sin conexion SUNAT ni validez tributaria. Sanctum por sesion; CSRF en escrituras. Owner/issuer emiten y reintentan; accountant consulta. PDF privado y correo de comprobantes accepted, con estados independientes y destino controlado de demostracion. Cobranza Checkout Pro de pruebas, deshabilitada sin configuracion; ver docs/api/cobranza.md. Planes, periodos y cuotas de emision; pagos unicos de suscripcion separados de cobranza."
+    "title": "Revenia - Comprobantes, cobranza y cartera",
+    "version": "1.12.0",
+    "description": "Catalogos y comprobantes 01/03 con importes enteros, numeracion transaccional, idempotencia, outbox y proveedor simulado. Sin conexion SUNAT ni validez tributaria. Sanctum por sesion; CSRF en escrituras. Owner/issuer emiten y reintentan; accountant consulta. PDF privado y correo de comprobantes accepted, con estados independientes y destino controlado de demostracion. Cobranza Checkout Pro de pruebas, deshabilitada sin configuracion; ver docs/api/cobranza.md. Planes, periodos y cuotas de emision; pagos unicos de suscripcion separados de cobranza. Notas 07 por líneas históricas completas, con reserva y aplicación al aceptar. Cartera actual por vencimiento en America/Lima y sesión recordada voluntaria. Cobros con receptor por empresa, suscripciones con receptor de plataforma y conciliación de pagos. Incidencias operativas por empresa con historial y recuperación por rol. Conector opcional de Odoo Community 18.0 por empresa."
   },
   "servers": [
     {
@@ -858,7 +858,8 @@
               "type": "string",
               "enum": [
                 "01",
-                "03"
+                "03",
+                "07"
               ]
             }
           },
@@ -1922,7 +1923,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "additionalProperties": false
+                "additionalProperties": false,
+                "properties": {
+                  "order_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Orden específica de este comprobante. Si se omite, se consultan hasta diez recientes."
+                  }
+                }
               }
             }
           }
@@ -1931,7 +1939,7 @@
     },
     "/api/v1/webhooks/mercadopago": {
       "post": {
-        "summary": "Notificacion de pago de pruebas; HMAC y consulta autoritativa posterior",
+        "summary": "Webhook de pagos de suscripciones a Revenia",
         "security": [],
         "parameters": [
           {
@@ -2278,7 +2286,7 @@
     "/api/v1/dashboard": {
       "get": {
         "summary": "Resumen de negocio y detalle reconciliable por empresa",
-        "description": "Actividad por primera aceptacion y confirmacion de pago; cartera actual sin filtro de fechas. Importes como cadenas enteras de centimos. Notas de credito no habilitadas. Ver docs/DASHBOARD.md.",
+        "description": "Actividad por primera aceptacion y confirmacion de pago; cartera actual sin filtro de fechas. Importes como cadenas enteras de centimos. Notas 07 por primera aceptación y cartera por neto actual. Ver docs/DASHBOARD.md.",
         "parameters": [
           {
             "name": "from",
@@ -2333,7 +2341,10 @@
                 "queued",
                 "failed",
                 "pdf_failed",
-                "email_failed"
+                "email_failed",
+                "credits",
+                "collection_review",
+                "odoo_review"
               ]
             }
           },
@@ -2359,6 +2370,1058 @@
           },
           "422": {
             "description": "Filtros no validos, company_id o campo desconocido"
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/credit-notes": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Preparar una nota 07 sobre una factura o boleta aceptada",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "series_id",
+                  "item_ids",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "series_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 250
+                  },
+                  "item_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operacion correcta",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DraftDocument"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion"
+          },
+          "403": {
+            "description": "Rol no autorizado"
+          },
+          "404": {
+            "description": "Recurso o referencia no disponible en la empresa"
+          },
+          "422": {
+            "description": "Datos invalidos: message y errors por campo"
+          },
+          "409": {
+            "description": "Comprobante incompatible o línea ocupada"
+          }
+        }
+      }
+    },
+    "/api/v1/receivables": {
+      "get": {
+        "summary": "Cartera actual por empresa, moneda y fecha de vencimiento",
+        "description": "Facturas y boletas aceptadas con saldo positivo. Corte en Lima, PEN por defecto, vencimiento más antiguo primero. Los totales incluyen todas las páginas que cumplen los filtros. El filtro operations incluye ventas pendientes de confirmación o en revisión aunque ya estén saldadas.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "currency",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PEN",
+                "USD"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "situation",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "upcoming",
+                "today",
+                "overdue",
+                "undated",
+                "late_1_30",
+                "late_31_60",
+                "late_61_90",
+                "late_over_90"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_from",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_to",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "schema": {
+              "enum": [
+                "oldest",
+                "newest"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "in": "query",
+            "name": "operations",
+            "schema": {
+              "enum": [
+                "pending",
+                "review"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cartera y resumen de antigüedad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Receivables"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida o cuenta inactiva"
+          },
+          "403": {
+            "description": "Acceso denegado"
+          },
+          "422": {
+            "description": "Filtros inválidos"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "Iniciar sesión web con protección CSRF",
+        "security": [],
+        "description": "La SPA obtiene primero la cookie CSRF de Sanctum. La preferencia remember activa el mecanismo de recuerdo del guard web.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 200
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "maxLength": 1024,
+                    "writeOnly": true
+                  },
+                  "remember": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Sesión regenerada"
+          },
+          "419": {
+            "description": "CSRF inválido"
+          },
+          "422": {
+            "description": "Credenciales o campos inválidos"
+          },
+          "429": {
+            "description": "Demasiados intentos"
+          }
+        }
+      }
+    },
+    "/api/v1/merchant-connection": {
+      "get": {
+        "summary": "Consultar la cuenta receptora de la empresa",
+        "description": "Solo el dueño de una empresa activa. Las escrituras requieren CSRF.",
+        "responses": {
+          "200": {
+            "description": "Estado público de la conexión",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MerchantConnection"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Se requiere el rol dueño"
+          }
+        }
+      },
+      "put": {
+        "summary": "Verificar y vincular el vendedor de pruebas de Perú",
+        "description": "Solo el dueño de una empresa activa. Las escrituras requieren CSRF.",
+        "responses": {
+          "200": {
+            "description": "Estado público de la conexión",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MerchantConnection"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Se requiere el rol dueño"
+          },
+          "422": {
+            "description": "Credencial o receptor inválido"
+          },
+          "503": {
+            "description": "Proveedor no disponible"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "access_token",
+                  "webhook_secret"
+                ],
+                "properties": {
+                  "access_token": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 2048,
+                    "writeOnly": true
+                  },
+                  "webhook_secret": {
+                    "type": "string",
+                    "minLength": 16,
+                    "maxLength": 512,
+                    "writeOnly": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Desactivar nuevos enlaces del vendedor",
+        "description": "Solo el dueño de una empresa activa. Las escrituras requieren CSRF.",
+        "responses": {
+          "200": {
+            "description": "Estado público de la conexión",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/MerchantConnection"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión inválida"
+          },
+          "403": {
+            "description": "Se requiere el rol dueño"
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/mercadopago/companies/{merchantCompany}": {
+      "post": {
+        "summary": "Webhook de cobros de la empresa emisora",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "merchantCompany",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "data.id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "type",
+                  "action",
+                  "data",
+                  "live_mode",
+                  "user_id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": [
+                      "string",
+                      "integer"
+                    ]
+                  },
+                  "type": {
+                    "const": "payment"
+                  },
+                  "action": {
+                    "enum": [
+                      "payment.created",
+                      "payment.updated"
+                    ]
+                  },
+                  "live_mode": {
+                    "const": false
+                  },
+                  "data": {
+                    "type": "object",
+                    "required": [
+                      "id"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": [
+                          "string",
+                          "integer"
+                        ]
+                      }
+                    }
+                  },
+                  "user_id": {
+                    "type": [
+                      "string",
+                      "integer"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persistido antes de responder"
+          },
+          "400": {
+            "description": "Payload o query ambiguo"
+          },
+          "401": {
+            "description": "Firma invalida"
+          },
+          "413": {
+            "description": "Cuerpo demasiado grande"
+          },
+          "415": {
+            "description": "Se requiere JSON"
+          },
+          "422": {
+            "description": "Evento o modo no admitido"
+          },
+          "503": {
+            "description": "Integracion deshabilitada"
+          }
+        }
+      }
+    },
+    "/api/v1/incidents": {
+      "get": {
+        "summary": "Consultar Incidencias de la empresa activa",
+        "parameters": [
+          {
+            "name": "process",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "emission",
+                "pdf",
+                "email",
+                "collection",
+                "odoo"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "attention",
+                "all",
+                "processing",
+                "delayed",
+                "retry",
+                "manual",
+                "failed",
+                "confirmation",
+                "resolved"
+              ]
+            }
+          },
+          {
+            "name": "alert",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "failed",
+                "pdf_failed",
+                "email_failed",
+                "collection_review",
+                "odoo_review"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PEN",
+                "USD"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operaciones, página, última página y total. Fechas según última actualización en Lima."
+          },
+          "401": {
+            "description": "Sesión inactiva"
+          },
+          "422": {
+            "description": "Filtros inválidos"
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{process}/{operation}": {
+      "parameters": [
+        {
+          "name": "process",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "emission",
+              "pdf",
+              "email",
+              "collection",
+              "odoo"
+            ]
+          }
+        },
+        {
+          "name": "operation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar la cronología y las acciones autorizadas",
+        "parameters": [
+          {
+            "name": "history_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación, situación, revisión y cronología paginada con actor y resultado"
+          },
+          "404": {
+            "description": "Referencia no disponible para la empresa"
+          }
+        }
+      }
+    },
+    "/api/v1/incidents/{process}/{operation}/actions": {
+      "parameters": [
+        {
+          "name": "process",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "emission",
+              "pdf",
+              "email",
+              "collection",
+              "odoo"
+            ]
+          }
+        },
+        {
+          "name": "operation",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Registrar revisión o solicitar una recuperación del proceso original",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "revision"
+                ],
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "reviewed",
+                      "retry_emission",
+                      "regenerate_pdf",
+                      "retry_email",
+                      "reconcile",
+                      "retry_odoo"
+                    ]
+                  },
+                  "revision": {
+                    "type": "string",
+                    "maxLength": 100
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Revisión registrada"
+          },
+          "202": {
+            "description": "Recuperación solicitada"
+          },
+          "403": {
+            "description": "Acción no autorizada"
+          },
+          "404": {
+            "description": "Referencia fuera de alcance"
+          },
+          "409": {
+            "description": "Operación o versión cambió"
+          },
+          "422": {
+            "description": "Solicitud inválida"
+          },
+          "429": {
+            "description": "Límite temporal alcanzado"
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/odoo": {
+      "get": {
+        "summary": "Configuración de Odoo del dueño",
+        "responses": {
+          "200": {
+            "description": "Disponibilidad, alias autorizados, empresa, revisión y correspondencias del destino"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        }
+      },
+      "put": {
+        "summary": "Verificar y guardar la conexión",
+        "responses": {
+          "200": {
+            "description": "Identidad verificada y configuración sin secretos"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "endpoint",
+                  "remote_company",
+                  "login"
+                ],
+                "properties": {
+                  "endpoint": {
+                    "type": "string"
+                  },
+                  "remote_company": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "login": {
+                    "type": "string"
+                  },
+                  "api_key": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "writeOnly": true
+                  },
+                  "revision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Habilitar o desactivar Odoo",
+        "responses": {
+          "200": {
+            "description": "Estado efectivo de la conexión"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "enabled",
+                  "revision"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "revision": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/odoo/mappings": {
+      "put": {
+        "summary": "Guardar una correspondencia del destino verificado",
+        "responses": {
+          "200": {
+            "description": "Correspondencias de la empresa"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "source",
+                  "remote_id",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "customer",
+                      "anonymous",
+                      "currency",
+                      "unit",
+                      "tax",
+                      "journal",
+                      "account"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "remote_id": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Quitar una correspondencia del destino verificado con su ID actual",
+        "responses": {
+          "200": {
+            "description": "Correspondencias de la empresa"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "source",
+                  "remote_id",
+                  "revision"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "customer",
+                      "anonymous",
+                      "currency",
+                      "unit",
+                      "tax",
+                      "journal",
+                      "account"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "remote_id": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "revision": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/documents/{documentId}/odoo": {
+      "parameters": [
+        {
+          "name": "documentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar transferencia y estado contable observado",
+        "responses": {
+          "200": {
+            "description": "Resultado local de lectura sin llamadas externas"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        }
+      },
+      "post": {
+        "summary": "Solicitar transferencia individual o autorizar un nuevo destino",
+        "responses": {
+          "202": {
+            "description": "Transferencia durable única por comprobante"
+          },
+          "401": {
+            "description": "Sesión no disponible"
+          },
+          "403": {
+            "description": "Acceso restringido"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [],
+                "properties": {
+                  "rebind": {
+                    "type": "boolean"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "destination": {
+                    "type": "string",
+                    "minLength": 64,
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2789,9 +3852,49 @@
               "$ref": "#/components/schemas/DraftItemInput"
             },
             "description": "Un producto por documento; IDs y productos sin duplicados."
+          },
+          "payment_terms": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "credit"
+            ]
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           }
         },
-        "description": "Alta completa. Los items no pueden enviar id. Campos del servidor rechazados incluso si son null. No se aceptan totales, estado, empresa, creador o numeracion."
+        "description": "Alta completa. Los items no pueden enviar id. Campos del servidor rechazados incluso si son null. No se aceptan totales, estado, empresa, creador o numeracion.",
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "payment_terms"
+              ],
+              "properties": {
+                "payment_terms": {
+                  "const": "credit"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "due_date"
+              ],
+              "properties": {
+                "due_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Igual o posterior a la emisión."
+                }
+              }
+            }
+          }
+        ]
       },
       "DraftUpdate": {
         "type": "object",
@@ -2848,9 +3951,49 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 2147483646
+          },
+          "payment_terms": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "credit"
+            ]
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           }
         },
-        "description": "PATCH envia la cabecera y lista completas. Items omitidos se eliminan; IDs presentes conservan identidad. Mismo producto conserva snapshot; reemplazo toma catalogo actual."
+        "description": "PATCH envia la cabecera y lista completas. Items omitidos se eliminan; IDs presentes conservan identidad. Mismo producto conserva snapshot; reemplazo toma catalogo actual.",
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "payment_terms"
+              ],
+              "properties": {
+                "payment_terms": {
+                  "const": "credit"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "due_date"
+              ],
+              "properties": {
+                "due_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Igual o posterior a la emisión."
+                }
+              }
+            }
+          }
+        ]
       },
       "DraftPreviewInput": {
         "type": "object",
@@ -2910,9 +4053,49 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 2147483646
+          },
+          "payment_terms": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "credit"
+            ]
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           }
         },
-        "description": "Alta sin document_id/version/ids de item. Edicion requiere document_id y version e IDs de las lineas existentes. Mismas reglas que guardado; cero escrituras."
+        "description": "Alta sin document_id/version/ids de item. Edicion requiere document_id y version e IDs de las lineas existentes. Mismas reglas que guardado; cero escrituras.",
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "payment_terms"
+              ],
+              "properties": {
+                "payment_terms": {
+                  "const": "credit"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "due_date"
+              ],
+              "properties": {
+                "due_date": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Igual o posterior a la emisión."
+                }
+              }
+            }
+          }
+        ]
       },
       "DraftItem": {
         "type": "object",
@@ -3015,7 +4198,8 @@
             "type": "string",
             "enum": [
               "01",
-              "03"
+              "03",
+              "07"
             ]
           }
         }
@@ -3030,7 +4214,9 @@
           "items",
           "totals",
           "customer",
-          "series"
+          "series",
+          "payment_terms",
+          "due_date"
         ],
         "properties": {
           "id": {
@@ -3041,7 +4227,8 @@
             "type": "string",
             "enum": [
               "01",
-              "03"
+              "03",
+              "07"
             ]
           },
           "currency": {
@@ -3210,6 +4397,46 @@
           },
           "delivery": {
             "$ref": "#/components/schemas/DocumentDelivery"
+          },
+          "source_document_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "source_number": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "credit_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "credit": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Disponibilidad por línea, notas vinculadas, series compatibles y saldo para la vista previa del original aceptado."
+          },
+          "payment_terms": {
+            "enum": [
+              "cash",
+              "credit",
+              null
+            ]
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
           }
         }
       },
@@ -3545,6 +4772,47 @@
             "items": {
               "$ref": "#/components/schemas/CollectedPayment"
             }
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "environment": {
+            "enum": [
+              "sandbox",
+              null
+            ]
+          },
+          "incidents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "order_id",
+                "error_code",
+                "updated_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "order_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "error_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
           }
         }
       },
@@ -3602,6 +4870,32 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "receiver_kind": {
+            "enum": [
+              "merchant",
+              "platform",
+              "legacy"
+            ]
+          },
+          "collector_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "environment": {
+            "enum": [
+              "sandbox",
+              null
+            ]
+          },
+          "connection_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3719,6 +5013,250 @@
           },
           "rule": {
             "type": "string"
+          }
+        }
+      },
+      "ReceivableRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "customer",
+          "currency",
+          "issue_date",
+          "due_date",
+          "bucket",
+          "days_late",
+          "outstanding_cents",
+          "needs_review",
+          "pending_confirmation"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "customer": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "issue_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "due_date": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "today",
+              "undated",
+              "late_1_30",
+              "late_31_60",
+              "late_61_90",
+              "late_over_90",
+              "settled"
+            ]
+          },
+          "days_late": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "outstanding_cents": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Céntimos enteros."
+          },
+          "needs_review": {
+            "type": "boolean"
+          },
+          "pending_confirmation": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Receivables": {
+        "type": "object",
+        "required": [
+          "currency",
+          "cutoff",
+          "timezone",
+          "summary",
+          "rows",
+          "page",
+          "last_page",
+          "per_page",
+          "total"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "enum": [
+              "PEN",
+              "USD"
+            ]
+          },
+          "cutoff": {
+            "type": "string",
+            "format": "date"
+          },
+          "timezone": {
+            "const": "America/Lima"
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "total",
+              "upcoming",
+              "today",
+              "overdue",
+              "undated",
+              "late_1_30",
+              "late_31_60",
+              "late_61_90",
+              "late_over_90"
+            ],
+            "properties": {
+              "total": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "upcoming": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "today": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "overdue": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "undated": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "late_1_30": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "late_31_60": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "late_61_90": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              },
+              "late_over_90": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Céntimos enteros."
+              }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "$ref": "#/components/schemas/ReceivableRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_page": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "per_page": {
+            "const": 20
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "MerchantConnection": {
+        "type": "object",
+        "required": [
+          "status",
+          "environment",
+          "ready",
+          "collector_id",
+          "nickname",
+          "verified_at",
+          "webhook_url"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "unlinked",
+              "connected",
+              "disabled",
+              "invalid"
+            ]
+          },
+          "environment": {
+            "const": "sandbox"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "collector_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nickname": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "webhook_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
           }
         }
       }

@@ -9,9 +9,9 @@ import type { DashboardData } from '../lib/dashboard'
 vi.mock('../lib/dashboard', async original => ({ ...await original<typeof import('../lib/dashboard')>(), getDashboard: vi.fn(), getDashboardDetail: vi.fn() }))
 const data: DashboardData = {
   currency: 'PEN', period: { from: '2026-11-01', to: '2026-11-30', currency: 'PEN' }, timezone: 'America/Lima', calculated_at: '2026-11-13T15:00:00Z',
-  activity: { accepted_cents: '12000', accepted_count: 2, credit_notes_cents: null, credit_notes_supported: false, collected_cents: '10000', payments_count: 1, rejected_count: 0 },
+  activity: { accepted_cents: '12000', accepted_count: 2, credit_notes_cents: '2360', credit_notes_supported: true, collected_cents: '10000', payments_count: 1, rejected_count: 0 },
   portfolio: { outstanding_cents: '2000', outstanding_count: 1, excess_cents: '0', excess_count: 0, review_count: 0 },
-  series: [{ date: '2026-11-01', accepted_cents: '12000', collected_cents: '10000' }], alerts: { queued: 0, failed: 0, pdf_failed: 0, email_failed: 0 }, recent: [],
+  series: [{ date: '2026-11-01', credit_notes_cents:'2360', accepted_cents: '12000', collected_cents: '10000' }], alerts: { queued: 0, failed: 0, pdf_failed: 0, email_failed: 0, collection_review: 0, odoo_review: 0 }, recent: [],
   usage: { status: 'active', period_id: 'period', plan_name: 'Básico', starts_at: '2026-11-01T05:00:00Z', ends_at: '2026-12-01T05:00:00Z', limit: 50, consumed: 6, remaining: 44, can_issue: true, expiring_soon: false, timezone: 'America/Lima', rule: '' },
   actions: { create_document: true, manage_subscription: true },
 }
@@ -37,11 +37,11 @@ it('applies custom currency and dates through URL filters', async () => {
   await waitFor(() => expect(router.state.location.search).toContain('currency=USD'))
   expect(getDashboard).toHaveBeenLastCalledWith('from=2026-11-01&to=2026-11-30&currency=USD', expect.any(AbortSignal))
 })
-it('shows zero activity without hiding the portfolio scope or inventing credit notes', async () => {
-  vi.mocked(getDashboard).mockResolvedValue({ ...data, series: [{ date: '2026-11-01', accepted_cents: '0', collected_cents: '0' }] })
+it('shows the period net and the current portfolio scope', async () => {
+  vi.mocked(getDashboard).mockResolvedValue({ ...data, series: [{ date: '2026-11-01', credit_notes_cents:'0', accepted_cents: '0', collected_cents: '0' }] })
   render(<DashboardPanel {...props()} />, path)
   await screen.findByText('No hay actividad en este periodo.')
-  expect(screen.getByText('No disponible')).toBeInTheDocument()
+  expect(screen.getByText('PEN 96.40')).toBeInTheDocument()
   expect(screen.getByText(/Todos los comprobantes aceptados/)).toHaveTextContent('sin filtro de fechas')
 })
 it('does not convert API failure to an empty state or expose server internals', async () => {

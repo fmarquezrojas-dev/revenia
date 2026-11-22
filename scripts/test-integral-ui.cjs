@@ -63,7 +63,7 @@ async function fill(id, value) {
 async function main() {
  const origin=process.env.E2E_ORIGIN||'http://localhost:5174';const project=process.env.E2E_PROJECT||'facturly-integral';
  const evidence=process.env.E2E_EVIDENCE_DIR||path.join(__dirname,'..','docs','testing','evidence');fs.mkdirSync(evidence,{recursive:true});
- const report={journeys:[],checks:[],external_payments:'Not executed: fixture gateway only',notes:'Blocked: credit note module absent'};
+ const report={journeys:[],checks:[],external_payments:'Not executed: fixture gateway only'};
  const {execFile}=require('node:child_process');const run=require('node:util').promisify(execFile);
  async function command(...args){const r=await run('docker',['compose','-p',project,'-f','compose.e2e.yaml','exec','-T','app',...args],{windowsHide:true,timeout:180000});return r.stdout.trim()}
  async function artisan(...args){return command('php','artisan',...args)}
@@ -118,6 +118,41 @@ async function main() {
  for(const width of [360,768,1280]){await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width===360});for(const target of ['/dashboard','/documents',route,'/subscription','/customers','/products']){await navigate(target);await waitFor(()=>evaluate('!!document.querySelector(".user-menu")&&!document.body.innerText.includes("Cargando")'),'responsive '+target);assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'));await capture('integral-'+target.split('/')[1]+'-'+width);} if(width===360){await clickSelector('button[aria-label="Abrir men\u00fa"]');await press('Escape');assert.ok(await evaluate('document.activeElement?.getAttribute("aria-label")==="Abrir men\u00fa"'))}}
  await signout();await signin('issuer');await navigate('/dashboard');await waitText('Cartera actual');assert.equal(await has('Gestionar plan y consumo'),false);await navigate('/users');await waitText('Acceso restringido');await signout();await signin('accountant');await navigate(route);await waitText('PDF privado y correo');assert.equal(await has('Enviar por correo'),false);assert.equal((await api('/api/v1'+route+'/issue','POST',{version:1},true,crypto.randomUUID())).status,403);
  await signout();await signin('foreign');for(const suffix of ['', '/events','/pdf','/collections']){assert.equal((await api('/api/v1'+route+suffix)).status,404)}assert.equal((await api('/api/v1/dashboard')).body.data.activity.accepted_cents,'0');
+ const sourceRoute = await artisan('demo:credit-note')
+ assert.equal(await artisan('demo:credit-note'), sourceRoute)
+ await navigate(sourceRoute)
+ await waitText('Crear nota de crédito')
+ const prior = (await api('/api/v1'+sourceRoute+'/collections')).body.data
+ assert.equal(prior.outstanding_cents,18000)
+ await click('Crear nota de crédito')
+ await clickSelector('.credit-line:nth-of-type(2) input')
+ await fill('credit-reason','Devolución del accesorio completo')
+ await waitText('PEN 56.00')
+ await click('Guardar nota en borrador')
+ await waitText('Comprobante de origen')
+ const noteRoute = await evaluate('location.pathname')
+ await click('Emitir comprobante')
+ await click('Confirmar emisión')
+ await waitFor(async()=>((await api('/api/v1'+noteRoute)).body.data.status!=='draft'),'credit reserved')
+ await artisan('issuance:tick')
+ await waitFor(async()=>((await api('/api/v1'+noteRoute)).body.data.status==='accepted'),'credit accepted')
+ await artisan('issuance:tick')
+ await waitFor(async()=>((await api('/api/v1'+noteRoute)).body.data.delivery.pdf.available),'credit PDF')
+ const credit = (await api('/api/v1'+noteRoute)).body.data
+ assert.equal(credit.totals.total_cents,23600)
+ const noteFile = await command('php','tests/EndToEnd/control.php','pdf-path',credit.id)
+ const pdfText = await command('pdftotext','-layout',noteFile,'-')
+ for(const expected of ['NOTA DE CRÉDITO',credit.source_number,'236.00 PEN','Emisión tributaria simulada','Devolución del accesorio completo']) assert.ok(pdfText.includes(expected),expected)
+ await navigate(sourceRoute)
+ await waitText('Exceso pagado')
+ const adjusted = (await api('/api/v1'+sourceRoute+'/collections')).body.data
+ assert.deepEqual([adjusted.original_cents,adjusted.credits_cents,adjusted.net_cents,adjusted.paid_cents,adjusted.outstanding_cents,adjusted.excess_cents],[118000,23600,94400,100000,0,5600])
+ await navigate('/dashboard')
+ await waitText('PEN 944.00')
+ const summary = (await api('/api/v1/dashboard')).body.data
+ assert.deepEqual([summary.activity.accepted_cents,summary.activity.credit_notes_cents,summary.activity.collected_cents,summary.portfolio.excess_cents,summary.portfolio.review_count],['118000','23600','100000','5600',1])
+ report.journeys.push({name:'Devolución parcial',result:'PASS',source:sourceRoute,note:noteRoute,net_cents:94400,excess_cents:5600})
+ await capture('integral-credit-dashboard')
  await command('php','tests/EndToEnd/control.php','expire-sessions');await navigate('/dashboard','/acceso');await waitText('Inicia sesi\u00f3n');assert.equal(await has('E2E Compania'),false);report.journeys.push({name:'E roles',result:'PASS',checks:'issuer/accountant permissions, foreign document/events/PDF/payments 404, expired session'});
  report.checks.push('360/768/1280 pages without overflow; mobile Escape restores focus; no JavaScript exceptions');assert.deepEqual(browserErrors,[]);report.result='PASS';report.state=JSON.parse(await command('php','tests/EndToEnd/control.php','inspect'));fs.writeFileSync(path.join(evidence,'e2e-report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 }

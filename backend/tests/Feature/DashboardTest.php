@@ -49,17 +49,17 @@ class DashboardTest extends DatabaseTestCase
         $id = (string) Str::uuid();
         if (! $order) {
             $order = (string) Str::uuid();
-            DB::table('payment_orders')->insert(['id' => $order, 'company_id' => $doc->company_id, 'document_id' => $doc->id, 'requested_by' => $doc->created_by, 'amount_cents' => $amount, 'currency' => 'PEN', 'status' => 'closed', 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('payment_orders')->insert(['provider' => 'test-history', 'id' => $order, 'company_id' => $doc->company_id, 'document_id' => $doc->id, 'requested_by' => $doc->created_by, 'amount_cents' => $amount, 'currency' => 'PEN', 'status' => 'closed', 'expires_at' => now()->addDay(), 'created_at' => now(), 'updated_at' => now()]);
         }
-        DB::table('payments')->insert(['id' => $id, 'company_id' => $doc->company_id, 'document_id' => $doc->id, 'order_id' => $order, 'provider_id' => (string) random_int(1, PHP_INT_MAX), 'amount_cents' => $amount, 'applied_cents' => $status === 'approved' ? $amount : 0, 'currency' => 'PEN', 'status' => $status, 'provider_updated_at' => now(), 'confirmed_at' => $status === 'approved' ? now() : null, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('payments')->insert(['provider' => 'test-history', 'id' => $id, 'company_id' => $doc->company_id, 'document_id' => $doc->id, 'order_id' => $order, 'provider_id' => (string) random_int(1, PHP_INT_MAX), 'amount_cents' => $amount, 'applied_cents' => $status === 'approved' ? $amount : 0, 'currency' => 'PEN', 'status' => $status, 'provider_updated_at' => now(), 'confirmed_at' => $status === 'approved' ? now() : null, 'created_at' => now(), 'updated_at' => now()]);
 
         return $id;
     }
 
-    public function test_empty_company_has_zeroes_and_explicit_unsupported_credits(): void
+    public function test_empty_company_has_zero_activity_and_credit(): void
     {
         $this->actor();
-        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.activity.accepted_cents', '0')->assertJsonPath('data.activity.collected_cents', '0')->assertJsonPath('data.activity.credit_notes_cents', null)->assertJsonPath('data.activity.credit_notes_supported', false)->assertJsonPath('data.portfolio.outstanding_cents', '0')->assertJsonCount(30, 'data.series')->assertJsonPath('data.usage.remaining', 50);
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.activity.accepted_cents', '0')->assertJsonPath('data.activity.collected_cents', '0')->assertJsonPath('data.activity.credit_notes_cents', '0')->assertJsonPath('data.activity.credit_notes_supported', true)->assertJsonPath('data.portfolio.outstanding_cents', '0')->assertJsonCount(30, 'data.series')->assertJsonPath('data.usage.remaining', 50);
     }
 
     public function test_known_activity_reconciles_without_join_multiplication_and_excludes_other_currency_and_company(): void
@@ -161,9 +161,10 @@ class DashboardTest extends DatabaseTestCase
         }
         $accepted = $this->accepted($u);
         DB::table('document_pdfs')->where('document_id', $accepted->id)->update(['status' => 'failed']);
-        $response = $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.activity.rejected_count', 1)->assertJsonPath('data.alerts.failed', 1)->assertJsonPath('data.alerts.queued', 1)->assertJsonPath('data.alerts.pdf_failed', 1)->assertJsonPath('data.usage.consumed', 4);
+        $response = $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.activity.rejected_count', 1)->assertJsonPath('data.alerts.failed', 2)->assertJsonPath('data.alerts.queued', 1)->assertJsonPath('data.alerts.pdf_failed', 1)->assertJsonPath('data.usage.consumed', 4);
         foreach (['failed', 'queued', 'pdf_failed'] as $metric) {
             $this->getJson('/api/v1/dashboard?metric='.$metric)->assertOk()->assertJsonPath('data.detail.total', $response->json('data.alerts.'.$metric));
+            $this->getJson('/api/v1/incidents?currency=PEN&alert='.$metric)->assertOk()->assertJsonPath('data.total', $response->json('data.alerts.'.$metric));
         }
     }
 

@@ -6,6 +6,7 @@ use App\Jobs\DeliverDocumentEmail;
 use App\Jobs\GeneratePrivatePdf;
 use App\Jobs\SendSimulatedDocument;
 use App\Models\Document;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -48,11 +49,29 @@ final class EmissionOutbox
                         RequestIssuance::enqueue($doc);
                     }
                     if ($doc->status === 'queued') {
-                        DB::table('emission_outbox')->where('document_id', $doc->id)->where('kind', 'emission')->where('generation', $doc->version)->where('published_at', '<', now()->subSeconds(180))->update(['published_at' => null, 'available_at' => now()]);
+                        self::republish($doc, 'emission', $doc->version);
                     }
                 });
             }
         });
+    }
+
+    /** Called inside the recovery transaction, with the document locked. */
+    public static function republish(Document $doc, string $kind, int $generation): void
+    {
+        $row = DB::table('emission_outbox')->where('company_id', $doc->company_id)->where('document_id', $doc->id)
+            ->where('kind', $kind)->where('generation', $generation)->where('published_at', '<', now()->subSeconds(180))->lockForUpdate()->first();
+        if ($row) {
+            self::queueEvent($row->id, $row->publication_attempts, 'publication_delayed',
+                CarbonImmutable::parse($row->published_at)->addSeconds(180));
+            DB::table('emission_outbox')->where('id', $row->id)->update(['published_at' => null, 'available_at' => now()]);
+        }
+    }
+
+    private static function queueEvent(string $id, int $attempt, string $event, \DateTimeInterface $at): void
+    {
+        DB::table('incident_queue_events')->insertOrIgnore(['id' => (string) Str::uuid7(), 'publication_id' => $id,
+            'attempt' => $attempt, 'event' => $event, 'occurred_at' => $at]);
     }
 
     public function publish(int $limit = 100): int
@@ -81,7 +100,16 @@ final class EmissionOutbox
                 DB::table('emission_outbox')->where('id', $row->id)->where('claim_token', $row->claim_token)->update(['published_at' => now(), 'claim_until' => null, 'claim_token' => null, 'last_error' => null]);
                 $count++;
             } catch (\Throwable) {
-                DB::table('emission_outbox')->where('id', $row->id)->where('claim_token', $row->claim_token)->update(['claim_until' => null, 'claim_token' => null, 'available_at' => now()->addSeconds(min(300, 10 * ($row->publication_attempts + 1))), 'last_error' => 'queue_unavailable']);
+                DB::transaction(function () use ($row): void {
+                    $attempt = $row->publication_attempts + 1;
+                    $changed = DB::table('emission_outbox')->where('id', $row->id)->where('claim_token', $row->claim_token)->update([
+                        'claim_until' => null, 'claim_token' => null, 'available_at' => now()->addSeconds(min(300, 10 * $attempt)),
+                        'last_error' => 'queue_unavailable',
+                    ]);
+                    if ($changed) {
+                        self::queueEvent($row->id, $attempt, 'publication_failed', now());
+                    }
+                });
             }
         }
 

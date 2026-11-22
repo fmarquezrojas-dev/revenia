@@ -53,9 +53,35 @@ class DocumentPolicy
         return $this->viewAny($user) && $user->role === UserRole::Owner ? Response::allow() : Response::deny();
     }
 
+    public function transferToOdoo(User $user, Document $document): Response
+    {
+        return $this->regeneratePdf($user, $document);
+    }
+
     public function createPayment(User $user, Document $document): Response
     {
         return $this->update($user, $document);
+    }
+
+    public function viewTeamAgenda(User $user): bool
+    {
+        return $this->viewAny($user) && in_array($user->role, [UserRole::Owner, UserRole::Accountant], true);
+    }
+
+    public function viewPersonalAgenda(User $user): bool
+    {
+        return $this->create($user);
+    }
+
+    public function assignCollection(User $user, Document $document): bool
+    {
+        return $this->view($user, $document)->allowed() && $user->role === UserRole::Owner;
+    }
+
+    public function manageFollowup(User $user, Document $document, ?string $assignee): bool
+    {
+        return $this->assignCollection($user, $document)
+            || ($this->createPayment($user, $document)->allowed() && $user->id === $assignee);
     }
 
     public function reconcilePayment(User $user, Document $document): Response

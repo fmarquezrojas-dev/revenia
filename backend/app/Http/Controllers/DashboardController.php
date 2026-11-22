@@ -22,13 +22,7 @@ class DashboardController extends Controller
         if ($unknown !== []) {
             throw ValidationException::withMessages(['filters' => 'Filtro no admitido.']);
         }
-        $now = CarbonImmutable::now('America/Lima');
-        $start = CarbonImmutable::parse($data['from'] ?? $now->startOfMonth()->toDateString(), 'America/Lima')->startOfDay();
-        $last = CarbonImmutable::parse($data['to'] ?? $now->endOfMonth()->toDateString(), 'America/Lima')->startOfDay();
-        if ($start->gt($last) || $start->diffInDays($last) >= 366) {
-            throw ValidationException::withMessages(['to' => 'El rango debe estar ordenado y contener como maximo 366 dias.']);
-        }
-        $filters = ['from' => $start->toDateString(), 'to' => $last->toDateString(), 'currency' => $data['currency'] ?? 'PEN', 'start_utc' => $start->utc()->toIso8601String(), 'end_exclusive_utc' => $last->addDay()->utc()->toIso8601String()];
+        $filters = BusinessDashboard::period($data, CarbonImmutable::now('America/Lima'));
         $result = DB::transaction(function () use ($request, $dashboard, $filters, $data): array {
             if (DB::transactionLevel() === 1) {
                 DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');

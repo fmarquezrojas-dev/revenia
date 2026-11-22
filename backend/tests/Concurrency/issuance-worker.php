@@ -4,6 +4,7 @@ use App\Actions\Delivery\GenerateDocumentPdf;
 use App\Actions\Issuance\EmissionOutbox;
 use App\Actions\Issuance\ProcessEmission;
 use App\Actions\Issuance\RequestIssuance;
+use App\Actions\Treasury\BankReceipts;
 use App\Contracts\TaxProvider;
 use App\Models\Document;
 use App\Models\User;
@@ -11,6 +12,8 @@ use App\Services\DocumentPdfRenderer;
 use App\Services\SimulatedTaxProvider;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 $connection = require __DIR__.'/bootstrap.php';
 [$script,$mode,$actorId,$documentId,$key,$directory,$worker] = $argv;
@@ -29,6 +32,13 @@ try {
             usleep(300000);
         });
         $status = 202;
+    } elseif ($mode === 'bank') {
+        BankReceipts::write(User::findOrFail($actorId), 'manage-treasury',
+            fn ($user) => app(BankReceipts::class)->execute($user, 'apply', $key, [
+                'request_id' => (string) Str::uuid(), 'revision' => 2,
+                'lines' => [['document_id' => $documentId, 'amount_cents' => 5000]],
+            ]));
+        $status = 200;
     } elseif ($mode === 'job') {
         app()->bind(TaxProvider::class, function () use ($connection): TaxProvider {
             return new class($connection) implements TaxProvider
@@ -79,6 +89,8 @@ try {
         app(EmissionOutbox::class)->publish();
         $status = 200;
     }
+} catch (HttpException $e) {
+    $status = $e->getStatusCode();
 } catch (HttpResponseException $e) {
     $status = $e->getResponse()->getStatusCode();
 }

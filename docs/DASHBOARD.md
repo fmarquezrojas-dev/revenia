@@ -1,6 +1,6 @@
 # Resumen de negocio y cierre del frontend
 
-Implementacion sobre los modulos existentes. Decision: [ADR-021](adr/ADR-021-dashboard-negocio.md). La emision sigue siendo simulada; los pagos, de demostracion. No se alteran datos historicos para poblar graficos.
+Implementacion sobre los modulos existentes. Decision: [ADR-021](adr/ADR-021-dashboard-negocio.md). La emisión tributaria es simulada y el adaptador de cobros opera en el entorno de pruebas. No se alteran datos historicos para poblar graficos.
 
 ## Diccionario de indicadores
 
@@ -9,16 +9,18 @@ Todos los importes se expresan en centimos como cadenas decimales enteras. PEN y
 | Indicador / clave de detalle | Definicion | Fecha y alcance | Exclusiones y reconciliacion |
 | --- | --- | --- | --- |
 | Emision aceptada / accepted | Suma de total_cents de facturas 01 y boletas 03 con primera aceptacion en el rango | MIN(document_events.created_at) para to_status=accepted; America/Lima | No borradores, pendientes, rechazos ni fallos sin aceptacion. No depende del estado actual; cada documento aparece una vez. Detalle accepted |
-| Notas aceptadas | No disponible, valor null y credit_notes_supported=false | Sin fuente de datos: notas y reservas no existen en este repositorio | No se inventa cero como capacidad soportada, no se calcula emision neta ni se excluyen documentos historicos por una acreditacion inexistente |
+| Notas aceptadas / credits | Importe de notas 07 aceptadas | Primera aceptación en el periodo y moneda seleccionados | El neto del periodo resta las notas a las ventas brutas. Puede ser negativo si se ajustan ventas anteriores |
 | Cobrado / payments | Suma de applied_cents de pagos de clientes que tuvieron confirmacion validada | confirmed_at dentro del rango | Excluye destinos de suscripcion, pendientes/rechazados nunca aplicados y ordenes sin pago. Cada pago persistido cuenta una vez; dos identificadores distintos cuentan dos veces y pueden generar exceso. Detalle payments, una fila por pago |
 | Rechazos / rejected | Documentos con primera respuesta rechazada del simulador en el rango | MIN(event.created_at) para to_status=rejected | No se confunde fallo tecnico con rechazo. Detalle rejected |
-| Saldo pendiente / outstanding | SUM(max(total_cents - pagos aplicados, 0)) | Cartera actual: todos los documentos aceptados de la moneda, SIN filtro de fechas | Agregacion de pagos previa al join. No descuenta ordenes pendientes ni pagos de suscripcion. Detalle solo documentos con saldo positivo |
-| Exceso pagado / excess | SUM(max(pagos aplicados - total_cents, 0)) | Misma cartera actual | Nunca saldo negativo. Detalle solo documentos con exceso |
+| Saldo pendiente / outstanding | SUM(max(total original - créditos aceptados - pagos aplicados, 0)) | Cartera actual: todos los documentos aceptados de la moneda, SIN filtro de fechas | Agregacion de pagos previa al join. No descuenta ordenes pendientes ni pagos de suscripcion. Detalle solo documentos con saldo positivo |
+| Exceso pagado / excess | SUM(max(pagos aplicados - neto de la venta, 0)) | Misma cartera actual | Nunca saldo negativo. Detalle solo documentos con exceso |
 | Pagos por revisar / review | Cantidad de documentos con exceso, pagos needs_review o trabajo de conciliacion review/failed | Misma cartera actual | DISTINCT por documento. El detalle muestra total original, no valor de ajuste; enlace al historial financiero del comprobante |
-| En cola / queued | Documentos con estado queued o sending | Estado actual, moneda seleccionada | Una fila por documento; excluye borradores y finalizados |
-| Fallos de emision / failed | Documentos con estado failed | Estado actual, moneda seleccionada | No se confunde con rechazo tributario |
-| PDF con error / pdf_failed | Documentos con PDF failed | Estado actual, moneda seleccionada | EXISTS por documento, sin duplicar importes |
-| Correo fallido o incierto / email_failed | Documentos con al menos un envio failed o unknown | Estado actual, moneda seleccionada | Incluye envios anteriores no resueltos; varios intentos no duplican el documento. Revisar historial de envio |
+| Emisiones en curso o demoradas / queued | Emisiones con procesamiento ordinario o demora documentada | Última actualización dentro del periodo y moneda seleccionados | Abre Incidencias con el mismo filtro |
+| Incidencias de emisión / failed | Reintento automático o manual, fallo confirmado o resultado por confirmar | Mismos filtros | Una fila por comprobante, incluidas las notas de crédito |
+| Incidencias de PDF / pdf_failed | Generaciones pendientes de recuperación, demoradas o fallidas | Mismos filtros | Una fila por PDF |
+| Incidencias de correo / email_failed | Entrega actual fallida, demorada, en reintento o incierta | Mismos filtros | El historial reúne los envíos del comprobante |
+| Incidencias de cobranza / collection_review | Órdenes de clientes que requieren recuperación o confirmación | Mismos filtros | Una fila por orden identificada de la empresa |
+| Incidencias de Odoo / odoo_review | Transferencias con reintento, dependencia, demora o resultado por verificar | Mismos filtros | Una fila por transferencia de comprobante y empresa |
 | Cuota | Limite, consumido, disponible y fechas del derecho vigente | Todas las monedas, periodo de suscripcion independiente del filtro de actividad | Reutiliza Subscriptions. Una primera emision confirmada en base consume; rechazos no devuelven cuota; reintentos no consumen otra vez |
 
 Las cantidades de aceptaciones/pagos/pendientes/excesos usan las mismas selecciones que sus importes. La actividad reciente son las cinco ultimas aceptaciones del rango y moneda, con cliente capturado en el snapshot y enlace al documento.
@@ -31,13 +33,15 @@ La cobranza anterior no almacenaba fecha de primera confirmacion. Se agrega paym
 
 Un reembolso/contracargo observado conserva applied_cents y exige revision segun la regla vigente de cobranza. Por ello el indicador historico sigue reflejando la confirmacion original, no una liquidacion neta bancaria. La cartera informa la revision y no descuenta automaticamente ajustes externos. No hay reparacion ni reembolso automatico.
 
-Notas parciales/totales, reservas y documentos totalmente acreditados no pueden probarse de extremo a extremo porque el dominio 07 no existe. Su incorporacion requiere definir la integracion financiera antes de habilitar esas metricas. La consulta de aceptaciones ya evita depender del estado actual.
+La cartera descuenta créditos aceptados en cualquier fecha. Una reserva bloquea el checkout incompatible mientras la venta conserva su neto anterior. Los documentos históricos sin nota mantienen su saldo.
+
+El indicador de saldo pendiente abre **Cuentas por cobrar** en la moneda seleccionada. La bandeja calcula la antigüedad a la fecha de consulta en Lima. Los indicadores de exceso y revisión siguen abriendo su detalle financiero. Las fechas del filtro de actividad se aplican a emisiones, notas y pagos del periodo.
 
 ## API y permisos
 
 `GET /api/v1/dashboard`: auth:sanctum, account.active, DocumentPolicy.viewAny. Acepta from/to (Y-m-d), currency (PEN/USD), group_by=day. Sin parametros usa mes actual/PEN. Rechaza company_id, columnas, ordenes y parametros desconocidos con 422.
 
-La respuesta data contiene currency, period (from/to/start_utc/end_exclusive_utc), timezone, calculated_at, activity, portfolio, series, alerts, recent, usage y actions. Importes siempre string; cantidades integer; notas null con soporte false. Cache-Control private,no-store.
+La respuesta data contiene currency, period (from/to/start_utc/end_exclusive_utc), timezone, calculated_at, activity, portfolio, series, alerts, recent, usage y actions. Importes siempre string; cantidades integer; credit_notes_cents es una cadena de céntimos y credit_notes_supported es true. Cache-Control private,no-store.
 
 `GET /api/v1/dashboard?metric=<clave>&page=1`: detalle de la misma seleccion, 20 filas/pagina, paginacion con total/last_page; devuelve period/currency/timezone/calculated_at/detail. No retorna snapshots, tokens, payloads de proveedor ni datos de otras empresas. Cada fila tiene document_id, numero, cliente, fecha relevante, importe, estado tributario, estado de pago cuando aplica y href al documento. La paginacion se ordena por fecha descendente e identidad estable.
 
@@ -81,7 +85,6 @@ Pruebas de backend exclusivamente en facturly_testing, con factories y fixtures;
 - Recorrer CRUD de empresa, usuarios, clientes, productos, series y borradores con los tres roles; verificar conflictos de version y cambios sin guardar.
 - Revisar flujos completos de emision, rechazo, recuperacion, PDF privado y correo en Mailpit; estados tributario/financiero/PDF/correo separados.
 - Ejecutar checkout sandbox real cuando existan credenciales y URL autorizada; las pruebas actuales de proveedor son simuladas.
-- Integrar notas de credito y reservas en un bloque propio, seguido de pruebas de acreditacion parcial/total y emision neta.
 - Ampliar accesibilidad con lector de pantalla y navegadores adicionales; la validacion automatica no sustituye esa revision.
 - Medir con volumen y distribucion representativos del despliegue antes de incorporar cache o prometer rendimiento.
 - Revalidar todas las rutas en 360/768/1280 px, datos largos, formularios, paginacion, sesion expirada y restauracion del foco.

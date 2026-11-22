@@ -6,16 +6,21 @@ use App\Actions\Payments\Collections;
 use App\Models\Document;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class PaymentController extends Controller
 {
     public function show(Request $request, string $documentId, Collections $collections): JsonResponse
     {
-        $doc = Document::where('company_id', $request->user()->company_id)->whereKey($documentId)->firstOrFail();
-        Gate::authorize('view', $doc);
+        $summary = DB::transaction(function () use ($request, $documentId, $collections) {
+            $doc = Document::where('company_id', $request->user()->company_id)->whereKey($documentId)->sharedLock()->firstOrFail();
+            Gate::authorize('view', $doc);
 
-        return response()->json(['data' => $collections->summary($doc, $request->user())])->header('Cache-Control', 'private, no-store');
+            return $collections->summary($doc, $request->user());
+        });
+
+        return response()->json(['data' => $summary])->header('Cache-Control', 'private, no-store');
     }
 
     public function create(Request $request, string $documentId, Collections $collections): JsonResponse
@@ -32,7 +37,11 @@ class PaymentController extends Controller
     {
         $doc = Document::where('company_id', $request->user()->company_id)->whereKey($documentId)->firstOrFail();
         Gate::authorize($operation === 'create' ? 'createPayment' : 'reconcilePayment', $doc);
-        if ($request->all() !== []) {
+        $order = null;
+        if ($operation === 'reconcile' && $request->has('order_id')) {
+            $order = $request->validate(['order_id' => ['required', 'uuid']])['order_id'];
+        }
+        if (array_diff(array_keys($request->all()), $operation === 'reconcile' ? ['order_id'] : []) !== []) {
             Collections::error('invalid_payload', 'Esta operacion no admite importes ni otros campos.', 422);
         }
         $key = $request->header('Idempotency-Key', '');
@@ -40,6 +49,6 @@ class PaymentController extends Controller
             Collections::error('invalid_idempotency_key', 'Envia una clave de idempotencia valida.', 422);
         }
 
-        return response()->json($collections->request($request->user(), $documentId, $key, $operation), 202);
+        return response()->json($collections->request($request->user(), $documentId, $key, $operation, $order), 202);
     }
 }

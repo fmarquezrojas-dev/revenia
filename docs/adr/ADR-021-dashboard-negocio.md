@@ -2,6 +2,8 @@
 
 Estado: implementado; decision registrada antes de consultas, 2026-11-13.
 
+Actualización del 2026-11-20. El dashboard incorpora la métrica `credits` y calcula la cartera sobre el neto después de notas aceptadas. El texto siguiente registra el alcance de la decisión original.
+
 Se reutilizan documentos, eventos, pagos y cuota existentes. No existen notas de credito ni reservas: el esquema solo admite 01/03. La tarjeta de notas informa no disponible, con valor null, sin fingir soporte ni calcular emision neta. El documento tecnico v1.2 original no esta disponible; prevalecen los contratos y ADR del repositorio.
 
 Actividad y cartera se separan. La actividad usa primera aceptacion/rechazo registrada en document_events, nunca issue_date ni updated_at. Un documento cuenta una vez en cada resultado. No se filtra la emision historica por su estado actual. La cartera comprende todos los documentos actualmente aceptados de la moneda seleccionada, sin filtro de fechas.

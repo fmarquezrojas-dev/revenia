@@ -1,0 +1,104 @@
+# Standalone recovery project. Never merge with compose.yaml or compose.override.yaml.
+x-recovery-labels: &recovery-labels
+  io.revenia.recovery.instance: ${RV_RESOURCE_TOKEN:-legacy}
+services:
+  db:
+    labels: *recovery-labels
+    image: ${RV_PG_IMAGE:?}
+    pull_policy: never
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: ${RV_DATABASE:?}
+      POSTGRES_PASSWORD_FILE: /run/recovery-password
+    volumes:
+      - type: volume
+        source: pg
+        target: /var/lib/postgresql/data
+        volume: {nocopy: true}
+      - type: bind
+        source: ${RV_STATE:?}/db.password
+        target: /run/recovery-password
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [isolated]
+  ops:
+    labels: *recovery-labels
+    image: ${RV_PHP_IMAGE:?}
+    pull_policy: never
+    entrypoint: ["sleep", "infinity"]
+    read_only: true
+    working_dir: /app
+    tmpfs: [/tmp, /app/storage, /app/bootstrap/cache]
+    environment:
+      APP_ENV: recovery
+      APP_DEBUG: "false"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_DATABASE: ${RV_DATABASE:?}
+      DB_USERNAME: postgres
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: "null"
+      MAIL_MAILER: array
+      MP_SANDBOX_ENABLED: "false"
+      ODOO_ENABLED: "false"
+      ODOO_ENDPOINTS: "{}"
+      DOCUMENT_STORAGE_ROOT: /restore/documents
+    volumes:
+      - type: volume
+        source: private
+        target: /restore
+        read_only: true
+        volume: {nocopy: true}
+      - type: bind
+        source: ${RV_PACKAGE:?}
+        target: /package
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${RV_STATE:?}/db.password
+        target: /run/recovery-password
+        read_only: true
+        bind: {create_host_path: false}
+      - ./scripts/recovery:/tools:ro
+      - ./backend/app:/app/app:ro
+      - ./backend/artisan:/app/artisan:ro
+      - ./backend/bootstrap/app.php:/app/bootstrap/app.php:ro
+      - ./backend/bootstrap/providers.php:/app/bootstrap/providers.php:ro
+      - ./backend/composer.json:/app/composer.json:ro
+      - ./backend/config:/app/config:ro
+      - ./backend/database/migrations:/app/database/migrations:ro
+      - ./backend/routes:/app/routes:ro
+      - ./backend/vendor:/app/vendor:ro
+    networks: [isolated]
+  review:
+    labels: *recovery-labels
+    image: ${RV_PHP_IMAGE:?}
+    pull_policy: never
+    read_only: true
+    entrypoint: ["php", "-d", "display_errors=0", "-S", "0.0.0.0:8080", "/viewer/review.php"]
+    ports: ["127.0.0.1:${RV_PORT:?}:8080"]
+    volumes:
+      - ./scripts/recovery/review.php:/viewer/review.php:ro
+      - type: bind
+        source: ${RV_STATE:?}/viewer.sha256
+        target: /run/viewer.sha256
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${RV_STATE:?}/reports
+        target: /reports
+        read_only: true
+        bind: {create_host_path: false}
+    networks: [isolated]
+volumes:
+  pg:
+    labels: *recovery-labels
+  private:
+    labels: *recovery-labels
+networks:
+  isolated:
+    labels: *recovery-labels
+    internal: true
+

@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 
 final class MercadoPagoSignature
 {
-    public function paymentId(Request $request): string
+    public function paymentId(Request $request, #[\SensitiveParameter] string $secret): string
     {
         // Read the raw query: PHP normalizes data.id to data_id; reject ambiguous duplicates.
         $ids = [];
@@ -27,7 +27,7 @@ final class MercadoPagoSignature
         $ts = $parts['ts'] ?? '';
         $digest = $parts['v1'] ?? '';
         abort_unless(preg_match('/\A[a-zA-Z0-9-]{1,150}\z/', $requestId) && preg_match('/\A[0-9]{1,20}\z/', $ts) && preg_match('/\A[a-fA-F0-9]{64}\z/', $digest), 401);
-        $expected = hash_hmac('sha256', 'id:'.$ids[0].';request-id:'.$requestId.';ts:'.$ts.';', config('payments.webhook_secret'));
+        $expected = hash_hmac('sha256', 'id:'.$ids[0].';request-id:'.$requestId.';ts:'.$ts.';', $secret);
         abort_unless(hash_equals($expected, strtolower($digest)), 401);
 
         // No arbitrary age cutoff: provider retries include multi-day intervals.

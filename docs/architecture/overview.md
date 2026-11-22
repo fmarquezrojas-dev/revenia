@@ -107,6 +107,6 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
-`issued` permanece como estado heredado admitido por el esquema; la emisión asíncrona actual recorre `queued/sending`. PDF, correo y cobranza tienen estados separados. Sus fallos no convierten un documento aceptado en rechazado. No hay estados de notas de crédito porque ese dominio no está implementado.
+`issued` permanece como estado heredado admitido por el esquema; la emisión asíncrona actual recorre `queued/sending`. PDF, correo y cobranza tienen estados separados. Sus fallos no convierten un documento aceptado en rechazado. Las notas 07 siguen el mismo circuito de emisión. La reserva financiera pasa de borrador a reservada y termina aplicada o liberada según el resultado definitivo.
 
 Fuentes: [RequestIssuance](../../backend/app/Actions/Issuance/RequestIssuance.php), [ProcessEmission](../../backend/app/Actions/Issuance/ProcessEmission.php), [EmissionOutbox](../../backend/app/Actions/Issuance/EmissionOutbox.php), [Collections](../../backend/app/Actions/Payments/Collections.php), [PaymentWork](../../backend/app/Actions/Payments/PaymentWork.php), [rutas](../../backend/routes/api.php).

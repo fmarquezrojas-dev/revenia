@@ -3,6 +3,8 @@
 namespace App\Actions\Issuance;
 
 use App\Actions\Delivery\DocumentDelivery;
+use App\Actions\Documents\CreditNotes;
+use App\Actions\Odoo\OdooTransfers;
 use App\Contracts\TaxProvider;
 use App\Models\Document;
 use App\Services\SimulatedTaxProvider;
@@ -65,8 +67,12 @@ final class ProcessEmission
             $doc->lease_until = null;
             $doc->version++;
             $doc->save();
+            if ($doc->doc_type === '07') {
+                CreditNotes::settle($doc);
+            }
             if ($doc->status === 'accepted') {
                 DocumentDelivery::ensurePdf($doc);
+                OdooTransfers::enqueue($doc);
             }
             DB::table('emission_attempts')->where('id', $attemptId)->update(['finished_at' => now(), 'outcome' => $doc->status]);
             RequestIssuance::event($doc, $doc->status, 'sending', null, $attemptId);

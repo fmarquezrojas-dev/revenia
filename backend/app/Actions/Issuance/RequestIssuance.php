@@ -2,6 +2,7 @@
 
 namespace App\Actions\Issuance;
 
+use App\Actions\Documents\CreditNotes;
 use App\Actions\Documents\DraftDocuments;
 use App\Actions\Series\ReserveNextNumber;
 use App\Actions\Subscriptions\Subscriptions;
@@ -62,20 +63,24 @@ final class RequestIssuance
                 }
                 app(Subscriptions::class)->consume($doc);
                 $series = DocumentSeries::where('company_id', $company->id)->whereKey($doc->series_id)->lockForUpdate()->firstOrFail();
-                $data = ['version' => $version, 'series_id' => $doc->series_id, 'customer_id' => $doc->customer_id, 'doc_type' => $doc->doc_type, 'currency' => $doc->currency, 'issue_date' => $doc->issue_date->format('Y-m-d'), 'items' => $doc->items->map(fn ($line) => ['id' => $line->id, 'product_id' => $line->product_id, 'quantity' => intdiv($line->quantity_millis, 1000).'.'.str_pad((string) ($line->quantity_millis % 1000), 3, '0', STR_PAD_LEFT)])->all()];
-                Validator::make($data, ['doc_type' => 'required|in:01,03', 'currency' => 'required|in:PEN,USD', 'issue_date' => 'required|date_format:Y-m-d|before_or_equal:'.now('America/Lima')->toDateString(), 'items' => 'required|array|min:1|max:50', 'items.*.product_id' => 'required|uuid|distinct:strict'])->validate();
-                $preview = app(DraftDocuments::class)->save($actor, $data, $id, true);
-                foreach ($preview['items'] as $line) {
-                    $doc->items()->whereKey($line['id'])->update(array_intersect_key($line, array_flip(['base_cents', 'igv_cents', 'total_cents'])));
+                if ($doc->doc_type === '07') {
+                    app(CreditNotes::class)->reserve($doc);
+                } else {
+                    $data = ['version' => $version, 'series_id' => $doc->series_id, 'customer_id' => $doc->customer_id, 'doc_type' => $doc->doc_type, 'currency' => $doc->currency, 'issue_date' => $doc->issue_date->format('Y-m-d'), 'items' => $doc->items->map(fn ($line) => ['id' => $line->id, 'product_id' => $line->product_id, 'quantity' => intdiv($line->quantity_millis, 1000).'.'.str_pad((string) ($line->quantity_millis % 1000), 3, '0', STR_PAD_LEFT)])->all()];
+                    Validator::make($data, ['doc_type' => 'required|in:01,03', 'currency' => 'required|in:PEN,USD', 'issue_date' => 'required|date_format:Y-m-d|before_or_equal:'.now('America/Lima')->toDateString(), 'items' => 'required|array|min:1|max:50', 'items.*.product_id' => 'required|uuid|distinct:strict'])->validate();
+                    $preview = app(DraftDocuments::class)->save($actor, $data, $id, true);
+                    foreach ($preview['items'] as $line) {
+                        $doc->items()->whereKey($line['id'])->update(array_intersect_key($line, array_flip(['base_cents', 'igv_cents', 'total_cents'])));
+                    }
+                    $doc->fill($preview['totals']);
+                    $doc->load('customer');
+                    $doc->fiscal_snapshot = ['issuer' => $company->only(['ruc', 'legal_name', 'trade_name', 'address']), 'customer' => $doc->customer?->only(['id', 'name', 'doc_type', 'doc_number', 'address', 'email', 'is_active']), 'series' => $series->only(['id', 'code', 'doc_type', 'is_active'])];
                 }
-                $doc->fill($preview['totals']);
                 try {
                     $number = app(ReserveNextNumber::class)->handle(DB::connection(), $company->id, $series->id);
                 } catch (\DomainException $e) {
                     throw ValidationException::withMessages(['series_id' => $e->getMessage()]);
                 }
-                $doc->load('customer');
-                $doc->fiscal_snapshot = ['issuer' => $company->only(['ruc', 'legal_name', 'trade_name', 'address']), 'customer' => $doc->customer?->only(['id', 'name', 'doc_type', 'doc_number', 'address', 'email', 'is_active']), 'series' => $series->only(['id', 'code', 'doc_type', 'is_active'])];
                 $doc->number = $number;
                 $doc->series_code = $series->code;
                 $doc->submission_id = (string) Str::uuid();

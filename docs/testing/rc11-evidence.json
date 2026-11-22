@@ -1,0 +1,638 @@
+{
+  "date_lima": "2026-11-21",
+  "code": {
+    "branch": "feature/notas-credito-simuladas",
+    "commit": "936e87a918495f4d37ec7fa34163fd242a94dbe5",
+    "local_origin_main": "936e87a918495f4d37ec7fa34163fd242a94dbe5",
+    "initial_status_entries": 190,
+    "initial_files": 467,
+    "initial_sha256": "b3a9efabb22ef718adacfde80fd6c585d37abd810aeafd9173e63b8841ef5bb8",
+    "reviewed_files": 470,
+    "reviewed_sha256": "860a4cb5c42939380793f0b25c4c3f81a5c44712e3b6831bdf195deb846391e9",
+    "reviewed_exclusions": [
+      "docs/testing/rc11-evidence.json",
+      "docs/testing/test-report.md"
+    ],
+    "changed_in_block": {
+      "backend/database/migrations/2026_11_20_000003_bind_payment_receivers.php": "bf18e7876daae93125f19e149cb7e434ddc7b56addf8b0f835332d0f8940215a",
+      "backend/database/migrations/2026_11_21_000002_add_bank_receipts.php": "2156f76c274a4cf60eb9c0f96b2c75691957d47ccfe698bd8686d3811dbda793",
+      "backend/tests/Concurrency/issuance-worker.php": "5b2c504495a3ddfdec6a234cbd11c3bea5ed37cb96e57776e2d49dcec997f712",
+      "backend/tests/Concurrency/issuance.php": "96ce1034e7206ecdcd2728cf1dc09d47ff7959e520e25ed18f540d8cc95267ad",
+      "backend/tests/Concurrency/migrations.php": "76bf68992d0f53a767eec3d659fcbdbc189d7877a585f036d840158d2c2d87d7",
+      "backend/tests/Concurrency/payments-worker.php": "3c77b6ae4862d16151ff368ae3178ad89f86e48a5bff2d99c7044ebfeb7b14c0",
+      "backend/tests/Concurrency/payments.php": "016c50154bbe2bcd375b4b9e54d67387bf259a83f7561825049f95ebce745af2",
+      "backend/tests/Feature/BankReceiptsTest.php": "eb676b7f1114028a7a8e69bc7ca1b10d13370ce693d62202b2114bb52618524a",
+      "backend/tests/Feature/OdooTransferRecoveryTest.php": "3ada2f6c3ad14ec3faeb55bff6c647acdaf59aae521f4f52941d281e27e09d13",
+      "compose.recovery.viewer.yaml": "961b170dba40c089cf623fe9d982c4203e33b8e11a600438a8ba7c1f32e36c2c",
+      "compose.yaml": "4090202eb50a975334fb1130b0fa9c4cff01c163ba9fad625585a2da414cc40d",
+      "docs/RESPALDO_Y_RESTAURACION.md": "b7412edd0c2c0f64478e9de1a241162e021dedb23de38b0cd9f19d26178ddfdf",
+      "scripts/recovery/restore.ps1": "3cd34de0f980ebe4e90e71dfe32ea7beb26bb2b1c5c558375e7aea8f2ec48b20",
+      "scripts/recovery/viewer-seccomp.json": "befbad6881a1d37030da728636681ce5d3ca538dc92735b9b5beff7e34aa6d6d"
+    },
+    "remote_main_checked": "936e87a918495f4d37ec7fa34163fd242a94dbe5"
+  },
+  "environment": {
+    "project": "facturly-e2e-b111ca0d7e51",
+    "cluster": "7710796596069457958",
+    "database": "facturly_series_testing_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "isolated_network": "00603a576f6f67437f4957c13dc1f52a41969ba27deaa43f60f46e0008d30762",
+    "browser_project": {
+      "project": "facturly-e2e-11ba5f00e210",
+      "cluster": "7710801702123454502"
+    },
+    "docker": "29.9.2",
+    "compose": "5.6.1",
+    "php": "8.4.28",
+    "laravel": "13.40.0",
+    "postgres": "17.11 (Debian 17.11-1.pgdg12+2)",
+    "horizon": "v5.50.1",
+    "php_image": "sha256:3855c8356455966d5c8906175ba6c750af1d440055c8c430244e4ae751813197",
+    "pg_image": "sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994",
+    "web_image": "sha256:28656c4c0c8196ff2653a7c2a3d0a15f5cfd8cb4251c06ad0b1d483fa5aedd35",
+    "odoo": "18.0-20261112",
+    "odoo_image": "odoo@sha256:0bd79cf07f59105c5697667c2241b86447e99c6adb036200df0e4e295785bdf3"
+  },
+  "migrations": [
+    "0001_01_01_000000_create_users_table",
+    "0001_01_01_000001_create_cache_table",
+    "0001_01_01_000002_create_jobs_table",
+    "2026_11_08_230653_create_personal_access_tokens_table",
+    "2026_11_09_185024_create_companies_table",
+    "2026_11_09_202318_prepare_users_for_companies",
+    "2026_11_10_120000_create_customers_table",
+    "2026_11_10_130000_create_products_table",
+    "2026_11_10_140000_create_document_series_table",
+    "2026_11_11_081808_create_documents_and_items_tables",
+    "2026_11_12_211601_add_simulated_issuance",
+    "2026_11_12_224500_add_private_document_delivery",
+    "2026_11_13_051102_create_local_demo_records_table",
+    "2026_11_13_055044_add_document_collections",
+    "2026_11_13_181309_add_subscription_periods_and_usage",
+    "2026_11_13_184544_add_dashboard_payment_confirmation_and_indexes",
+    "2026_11_20_000001_add_credit_notes",
+    "2026_11_20_000002_add_document_payment_terms",
+    "2026_11_20_000003_bind_payment_receivers",
+    "2026_11_20_000004_add_incident_follow_up",
+    "2026_11_20_000005_add_odoo_transfers",
+    "2026_11_21_000001_add_collection_follow_up",
+    "2026_11_21_000002_add_bank_receipts"
+  ],
+  "upgrade": {
+    "before_after_digest": "72bee08aaefa81e31bc8a619196076dd14e015a74208d282071d87181f453ed2",
+    "values": [
+      "8500",
+      "3500",
+      true,
+      null,
+      "legacy",
+      23
+    ]
+  },
+  "backend": {
+    "tests": 407,
+    "assertions": 2290,
+    "pint_files": 237
+  },
+  "frontend": {
+    "test_files": 14,
+    "tests": 161,
+    "build": true,
+    "lint": true
+  },
+  "checks": {
+    "bank_and_issuance": {
+      "same_key": [
+        {
+          "pid": 6104,
+          "status": 202
+        },
+        {
+          "pid": 6103,
+          "status": 202
+        }
+      ],
+      "different_keys": [
+        {
+          "pid": 6130,
+          "status": 202
+        },
+        {
+          "pid": 6131,
+          "status": 409
+        }
+      ],
+      "same_series": [
+        {
+          "pid": 6141,
+          "status": 202
+        },
+        {
+          "pid": 6140,
+          "status": 202
+        }
+      ],
+      "duplicate_jobs": [
+        {
+          "pid": 6155,
+          "status": 200
+        },
+        {
+          "pid": 6154,
+          "status": 200
+        }
+      ],
+      "publishers": [
+        {
+          "pid": 6166,
+          "status": 200
+        },
+        {
+          "pid": 6165,
+          "status": 200
+        }
+      ],
+      "numbers": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "redis_unavailable_then_recovered": "PASS",
+      "duplicate_pdf_workers": [
+        {
+          "pid": 6170,
+          "status": 200
+        },
+        {
+          "pid": 6169,
+          "status": 200
+        }
+      ],
+      "overlapping_credits": [
+        {
+          "pid": 6177,
+          "status": 202
+        },
+        {
+          "pid": 6178,
+          "status": 409
+        }
+      ],
+      "same_bank_receipt": [
+        {
+          "pid": 6189,
+          "status": 409
+        },
+        {
+          "pid": 6190,
+          "status": 200
+        }
+      ]
+    },
+    "payments": {
+      "same_key": [
+        {
+          "pid": 9370,
+          "status": "completed"
+        },
+        {
+          "pid": 9369,
+          "status": "completed"
+        }
+      ],
+      "different_keys": [
+        {
+          "pid": 9373,
+          "status": "completed"
+        },
+        {
+          "pid": 9372,
+          "status": "completed"
+        }
+      ],
+      "lost_preference_response": [
+        {
+          "pid": 9375,
+          "status": "interrupted"
+        }
+      ],
+      "creation_workers": [
+        {
+          "pid": 9378,
+          "status": "completed"
+        },
+        {
+          "pid": 9377,
+          "status": "completed"
+        }
+      ],
+      "duplicate_payment": [
+        {
+          "pid": 9383,
+          "status": "completed"
+        },
+        {
+          "pid": 9384,
+          "status": "completed"
+        }
+      ],
+      "distinct_payments": [
+        {
+          "pid": 9386,
+          "status": "completed"
+        },
+        {
+          "pid": 9387,
+          "status": "completed"
+        }
+      ]
+    },
+    "subscriptions": {
+      "last_quota": [
+        {
+          "pid": 1358,
+          "status": 202
+        },
+        {
+          "pid": 1359,
+          "status": 422
+        }
+      ],
+      "renewal": [
+        {
+          "pid": 1361,
+          "status": 202
+        },
+        {
+          "pid": 1362,
+          "status": 202
+        }
+      ],
+      "payment_activation": [
+        {
+          "pid": 1364,
+          "status": 202
+        },
+        {
+          "pid": 1363,
+          "status": 202
+        }
+      ],
+      "provider": "fake; no external payment"
+    },
+    "documents": {
+      "connections": 2,
+      "statuses": [
+        200,
+        409
+      ],
+      "version": 2,
+      "number": null,
+      "series_counter": 0,
+      "results": [
+        {
+          "pid": 1411,
+          "status": 200,
+          "code": null
+        },
+        {
+          "pid": 1410,
+          "status": 409,
+          "code": "document_version_conflict"
+        }
+      ]
+    },
+    "users": [
+      {
+        "case": "last_user_slot",
+        "workers": [
+          {
+            "pid": 1397,
+            "status": 200
+          },
+          {
+            "pid": 1398,
+            "status": 422
+          }
+        ]
+      },
+      {
+        "case": "last_active_owner",
+        "workers": [
+          {
+            "pid": 1400,
+            "status": 422
+          },
+          {
+            "pid": 1399,
+            "status": 200
+          }
+        ]
+      }
+    ],
+    "series": {
+      "independent_connections": 4,
+      "workers": 4,
+      "assignments": 20,
+      "unique_numbers": 20,
+      "first": 1,
+      "last": 20,
+      "final_counter": 20,
+      "full_rollback": "PASS"
+    },
+    "outage": {
+      "result": "PASS",
+      "redis_offline": {
+        "id": "01a200d3-52ea-7221-bd57-1215dc9c917d",
+        "status": "queued",
+        "number": 1,
+        "consumptions": 1,
+        "publication_error": "queue_unavailable",
+        "published": false,
+        "attempts": 0,
+        "provider_calls": null,
+        "paused": false
+      },
+      "worker_stopped": {
+        "id": "01a200d3-52ea-7221-bd57-1215dc9c917d",
+        "status": "queued",
+        "number": 1,
+        "consumptions": 1,
+        "publication_error": null,
+        "published": true,
+        "attempts": 0,
+        "provider_calls": null,
+        "paused": false
+      },
+      "recovered": {
+        "id": "01a200d3-52ea-7221-bd57-1215dc9c917d",
+        "status": "accepted",
+        "number": 1,
+        "consumptions": 1,
+        "publication_error": null,
+        "published": true,
+        "attempts": 1,
+        "provider_calls": 1,
+        "paused": false
+      },
+      "worker_killed_after_provider_acceptance": {
+        "id": "01a200d3-e485-73d9-8142-bad905c1d798",
+        "status": "sending",
+        "number": 1,
+        "consumptions": 1,
+        "publication_error": null,
+        "published": true,
+        "attempts": 1,
+        "provider_calls": 1,
+        "paused": true
+      },
+      "reconciled": {
+        "id": "01a200d3-e485-73d9-8142-bad905c1d798",
+        "status": "accepted",
+        "number": 1,
+        "consumptions": 1,
+        "publication_error": null,
+        "published": true,
+        "attempts": 2,
+        "provider_calls": 1,
+        "paused": true
+      }
+    },
+    "browser": {
+      "journeys": [
+        {
+          "name": "A principal",
+          "result": "PASS",
+          "document": "01a200df-1585-73d9-a1b1-7e016e2cdfe3",
+          "pdf_bytes": 25799,
+          "mailpit_message": "ndKCsp5yoJcbRmYhUyExEE"
+        },
+        {
+          "name": "C cobranza",
+          "result": "PASS with fixture gateway",
+          "notifications": 10,
+          "payments": 1
+        },
+        {
+          "name": "D SaaS",
+          "result": "PASS with fixture gateway",
+          "quota": 2,
+          "renewal": "next period, no immediate quota increase"
+        },
+        {
+          "name": "Devolución parcial",
+          "result": "PASS",
+          "source": "/documents/01a200e1-54f4-7220-9e6e-47fb4961bb20",
+          "note": "/documents/01a200e1-5f5c-70ce-a855-31021c613512",
+          "net_cents": 94400,
+          "excess_cents": 5600
+        },
+        {
+          "name": "E roles",
+          "result": "PASS",
+          "checks": "issuer/accountant permissions, foreign document/events/PDF/payments 404, expired session"
+        }
+      ],
+      "checks": [
+        "Real HTTP CSRF 419; session cookie regenerated, HttpOnly, SameSite=Lax",
+        "Revenia login/title, R mark, no old visible brand; real email subject and body use Revenia",
+        "360/768/1280 pages without overflow; mobile Escape restores focus; no JavaScript exceptions"
+      ],
+      "external_payments": "Not executed: fixture gateway only",
+      "result": "PASS",
+      "state": {
+        "documents": 5,
+        "payments": 3,
+        "consumptions": 4,
+        "outbox_pending": 0,
+        "failed_jobs": 0
+      }
+    },
+    "pdf": {
+      "result": "PASS",
+      "samples": [
+        {
+          "name": "factura-pen",
+          "pages": 1,
+          "total": "302.76",
+          "currency": "PEN",
+          "unicode": true,
+          "real_renderer": true,
+          "brand": "Revenia",
+          "metadata": true
+        },
+        {
+          "name": "boleta-anonima",
+          "pages": 1,
+          "total": "163.88",
+          "currency": "PEN",
+          "unicode": true,
+          "real_renderer": true,
+          "brand": "Revenia",
+          "metadata": true
+        },
+        {
+          "name": "factura-usd-50-lineas",
+          "pages": 8,
+          "total": "7369.00",
+          "currency": "USD",
+          "unicode": true,
+          "real_renderer": true,
+          "brand": "Revenia",
+          "metadata": true
+        }
+      ]
+    },
+    "mcp": {
+      "protocol": "2025-03-26",
+      "tools": [
+        "resumen_cobranza",
+        "listar_comprobantes_pendientes",
+        "consultar_comprobante"
+      ],
+      "authenticated": 3,
+      "cents": 8500,
+      "foreign_equals_missing": true,
+      "revoked": true
+    },
+    "odoo": {
+      "worker_exit": 73,
+      "leases_recovered": 1,
+      "rows": [
+        {
+          "status": "done",
+          "error_code": null,
+          "accounting_state": "draft",
+          "external_id": 3,
+          "attempts": 2
+        },
+        {
+          "status": "done",
+          "error_code": null,
+          "accounting_state": "draft",
+          "external_id": 4,
+          "attempts": 2
+        }
+      ],
+      "remote": "3|out_invoice|draft|11.80|\n4|out_refund|draft|11.80|3",
+      "events": "attempt_started|8\nodoo_dependency|2\nodoo_done|4\nodoo_queued|4",
+      "currency": "USD"
+    },
+    "odoo_invoice": {
+      "row": {
+        "status": "done",
+        "external_id": 5,
+        "accounting_state": "draft",
+        "attempts": 1,
+        "error_code": null
+      },
+      "remote": "01|out_invoice|draft|29.50|4.50"
+    },
+    "mercado_pago_external": "pendiente",
+    "backup_seconds": 8.9119409,
+    "package_files": [
+      {
+        "name": "database.dump",
+        "bytes": 217379,
+        "sha256": "23998358b0f79a0ba951433072e3851ef5760776108c7a58ff96f5552713e465"
+      },
+      {
+        "name": "private.zip",
+        "bytes": 193905,
+        "sha256": "5d79442be1b6f16980e8a7d7d244031393eca3c6ba49f4ff898cda9e030bffdd"
+      },
+      {
+        "name": "files.json",
+        "bytes": 1949,
+        "sha256": "e350b95f2b77c4b6420f5f37b8a7b6726c654f4cdc92e93a20c5e0e8e8916610"
+      },
+      {
+        "name": "inventory.ndjson",
+        "bytes": 33806,
+        "sha256": "5bb708f8205aca623a38a275c9194851334c55b4c9d88ec92f8b35f3a201b989"
+      }
+    ],
+    "restore": {
+      "package_digest": "60f69b5eaccce6e310caafbeacac5a8bf6bd2ab4efdc718be226ca3b3b1cb1dc",
+      "project": "revenia-restore-212687e677e5",
+      "cluster": "7710802777495359527",
+      "rows": 10,
+      "sha256": "a28706334c13c2e6b4042628675f7047c7ced69e911daa8d8a4ebad6e9911356",
+      "bank": "5000|2500|2|1",
+      "pg_seconds_with_files": 8.727224999999999,
+      "bytes": 447039,
+      "http": [
+        401,
+        405,
+        404,
+        200
+      ],
+      "connect_errno": 1,
+      "services": [
+        "review",
+        "ops",
+        "db"
+      ],
+      "counts": {
+        "private_files": 9,
+        "pdfs": 8,
+        "checks": 85,
+        "missing": 0,
+        "different": 0,
+        "problems": 0
+      },
+      "companies": 8
+    },
+    "invalid_package": {
+      "modified_dump_rejected": true,
+      "new_resources": 0
+    }
+  },
+  "cleanup": {
+    "projects": [
+      "facturly-e2e-b111ca0d7e51",
+      "facturly-e2e-11ba5f00e210",
+      "revenia-restore-212687e677e5",
+      "revenia-restore-ac104aba1378",
+      "revenia-restore-e2c0a8db182f"
+    ],
+    "remaining_containers": 0,
+    "remaining_volumes": 0,
+    "remaining_networks": 0,
+    "docker_desktop_after": "detenido, canal dockerDesktopLinuxEngine ausente"
+  },
+  "audits": {
+    "composer_advisories": 0,
+    "npm_vulnerabilities": 0,
+    "openapi_validated": [
+      "docs/api/openapi.json",
+      "docs/api/openapi-products.json"
+    ]
+  },
+  "log_sha256": {
+    "phpunit-rc11.log": "678922226545128786fef665d0802ac29039c607074760e9caf72dec54f42d40",
+    "pint-rc11.log": "c5c4bb95e11cebaab493a939eb710abc2b7216a4785bb6350d65cb536f5bbe5f",
+    "composer.log": "43add299dc97ecbd90ec2dc456ef5a0bd824bb9abdae2a3d7cdb520e21f8e86d",
+    "platform.log": "1c9b747f97007baf02cda57de74a3e1124ff4fa0b1de85736843ed412eec7d23",
+    "audit-php.log": "0046e84f375c11ed2bdc90e758acd0530b66a6905121613e20e9fac2525684f2",
+    "audit-js.log": "363bd99813debae8124a943f23cd9623a0024ddf46124fdf72682b2472c87adb",
+    "build.log": "63d045b42724472cee07c4e93ac97db204ddd48f3f3511c549ff938cb1cb2318",
+    "vitest.log": "ad692edc95a788f773003a85b0145175d065ef2676994f4070f34318404960c0",
+    "eslint.log": "f19c534df39f1206bb595ada571cf5b9a526e63ff80c76d2879cda60cd76f584",
+    "contract-openapi.log": "cb557ed963fd878ba68b910dedffe6466fa445741b7b9f82d21283a710c15762",
+    "contract-openapi-products.log": "2e81a0d76b90ef7a514ead91b0b15961ad347501320456c87fea28c6a4d9088f",
+    "clean-twice.log": "99584a9b87b3e2b578faea8aa68ba6fcfd9cc85e4ed87fb836c6c8cdb0ddf9dc",
+    "bank2.log": "bb249b8612cc5129fbec03a1a7deec91a35cc31561f8745e257dbbf882e396c7",
+    "payment-rc11.log": "d0892b9edf4d2530a5c6a11dc23c80c10b68c345d939019d92eb1c5fa8bc383a",
+    "upgrade-final.json": "606bc669aef3bf02b02d97483cfd9f2213eadcda479d36a97cda86dd6d80f9a4",
+    "ui-evidence/e2e-report.json": "83d096e9aae785a3eb3ed8cd07571dbf44276f6f2ed6cc8b4881cc1ad673ef74",
+    "evidence/recovery-report.json": "a6920c9c0b947e557c6b6193ce246887ff58bf15c418b70f18fd3c3bcb77f944",
+    "evidence/pdf-report.json": "ef091a8f3e8ef0a62df4d5d73fa2575b7d5139f42f6500e6a597706393dcc3fa",
+    "mcp.json": "ef5f6f988d582be4d589b2afde40b14abe5e0eadce21eb0f104055a5a520de35",
+    "odoo.json": "2a25c1ba6d279dade185d4c7e9f6ade127eaff618c76d063d4de98e8a054a966",
+    "od-invoice.json": "7f3a815df9a582af8f0004c7d9ee45e955f3e2d5285912b8c038be3c9dcc08fc",
+    "restore-finance-final.json": "aae0e361d6f97b56fa34b0e199646fda0a89245669713490c02fab3254231afe",
+    "negative.json": "413cd982ce7968bc5ea67229d6e8bf69a27625bf7e88c4751642ec8b43bf91c0",
+    "cleanup.json": "bb659290f12b11b5de1ac74f43e714df1fe2f4f26595d89654070479877bba0e"
+  }
+}

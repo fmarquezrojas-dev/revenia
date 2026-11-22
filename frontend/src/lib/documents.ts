@@ -3,9 +3,16 @@ import { request, prepareCsrf, ApiError } from './api'
 import type { Customer, Product, ProductsResponse } from './api'
 export interface Totals { taxable_cents: number; exempt_cents: number; unaffected_cents: number; igv_cents: number; total_cents: number }
 export interface DraftLine { currency?: string; id?: string; product_id: string; quantity: string; description: string; unit_code: string; unit_price_cents: number; tax_type: string; base_cents?: number; igv_cents?: number; total_cents?: number; product_is_active?: boolean; product_currency?: string }
-export interface SeriesOption { id: string; code: string; doc_type: '01' | '03'; is_active?: boolean }
-export interface DraftDocument { delivery?: DeliveryState | null; id: string; doc_type: '01' | '03'; currency: 'PEN' | 'USD'; issue_date: string; status: 'draft' | 'issued' | 'queued' | 'sending' | 'accepted' | 'rejected' | 'failed'; formatted_number?: string | null; can_retry?: boolean; next_attempt_at?: string | null; result_message?: string | null; failure_kind?: string | null; attempt_count?: number; version: number; number: number | null; customer_id: string | null; series_id: string; customer: Pick<Customer,'id'|'name'|'doc_type'|'doc_number'|'is_active'> | null; series: SeriesOption; items: DraftLine[]; totals: Totals }
-export interface DraftInput { doc_type: '01' | '03'; currency: 'PEN' | 'USD'; issue_date: string; customer_id: string | null; series_id: string; version?: number; items: { id?: string; product_id: string; quantity: string }[] }
+export interface SeriesOption { id: string; code: string; doc_type: '01' | '03' | '07'; is_active?: boolean }
+export interface CreditDetail {
+ notes: {id:string; series_code:string|null; number:number|null; status:DraftDocument['status']; total_cents:number}[]
+ states: Record<string,'applied'|'reserved'>
+ series: {id:string; code:string}[]
+ balance: {net_cents:number; paid_cents:string}
+}
+export type PaymentTerms = 'cash' | 'credit'
+export interface DraftDocument { payment_terms?: PaymentTerms | null; due_date?: string | null; credit?:CreditDetail|null; source_document_id?:string|null; source_number?:string|null; credit_reason?:string|null; delivery?: DeliveryState | null; id: string; doc_type: '01' | '03' | '07'; currency: 'PEN' | 'USD'; issue_date: string; status: 'draft' | 'issued' | 'queued' | 'sending' | 'accepted' | 'rejected' | 'failed'; formatted_number?: string | null; can_retry?: boolean; next_attempt_at?: string | null; result_message?: string | null; failure_kind?: string | null; attempt_count?: number; version: number; number: number | null; customer_id: string | null; series_id: string; customer: Pick<Customer,'id'|'name'|'doc_type'|'doc_number'|'is_active'> | null; series: SeriesOption; items: DraftLine[]; totals: Totals }
+export interface DraftInput { payment_terms?: PaymentTerms; due_date?: string; doc_type: '01' | '03'; currency: 'PEN' | 'USD'; issue_date: string; customer_id: string | null; series_id: string; version?: number; items: { id?: string; product_id: string; quantity: string }[] }
 export interface Preview { items: DraftLine[]; totals: Totals; version: number | null }
 export interface DocumentFilters { doc_type: string; status: string; customer_id: string; date_from: string; date_to: string; page: number }
 export interface DocumentsResult { data: DraftDocument[]; meta: ProductsResponse['meta'] }
@@ -20,6 +27,10 @@ export async function previewDocument(data: DraftInput, id?: string, signal?: Ab
 }
 export async function saveDocument(data: DraftInput, id?: string): Promise<DraftDocument> {
  await prepareCsrf(); return (await request<{data: DraftDocument}>('/api/v1/documents' + (id ? '/'+encodeURIComponent(id) : ''),{method:id?'PATCH':'POST',body:JSON.stringify(data)})).data
+}
+export async function createCreditNote(id:string, data:{series_id:string; reason:string; item_ids:string[]}):Promise<DraftDocument> {
+ await prepareCsrf()
+ return (await request<{data:DraftDocument}>('/api/v1/documents/'+encodeURIComponent(id)+'/credit-notes',{method:'POST',body:JSON.stringify(data)})).data
 }
 export async function deleteDocument(id: string, version: number): Promise<void> { await prepareCsrf(); return request('/api/v1/documents/'+encodeURIComponent(id),{method:'DELETE',body:JSON.stringify({version})}) }
 export function documentError(error: unknown): string {

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Delivery;
 
+use App\Actions\Issuance\EmissionOutbox;
 use App\Models\Company;
 use App\Models\Document;
 use App\Models\User;
@@ -153,7 +154,7 @@ final class DocumentDelivery
                 self::outbox($doc, 'email', $delivery, $sequence);
                 $response = ['data' => ['id' => $delivery, 'status' => 'pending']];
             }
-            DB::table('document_delivery_requests')->insert(['id' => (string) Str::uuid(), 'company_id' => $company->id, 'document_id' => $id, 'operation' => $operation, 'key' => $key, 'fingerprint' => $fingerprint, 'response' => json_encode($response, JSON_THROW_ON_ERROR), 'created_at' => now()]);
+            DB::table('document_delivery_requests')->insert(['id' => (string) Str::uuid(), 'company_id' => $company->id, 'document_id' => $id, 'actor_id' => $actor->id, 'operation' => $operation, 'key' => $key, 'fingerprint' => $fingerprint, 'response' => json_encode($response, JSON_THROW_ON_ERROR), 'created_at' => now()]);
 
             return $response;
         }, 3);
@@ -179,7 +180,7 @@ final class DocumentDelivery
                         $pdf->status = 'pending';
                     }
                     if ($pdf->status === 'pending') {
-                        $this->republish($doc->id, 'pdf', $pdf->version);
+                        EmissionOutbox::republish($doc, 'pdf', $pdf->version);
                     }
                     $emails = DB::table('document_email_deliveries')->where('document_id', $doc->id)->whereIn('status', ['pending', 'sending'])->lockForUpdate()->get();
                     foreach ($emails as $email) {
@@ -187,17 +188,12 @@ final class DocumentDelivery
                             DB::table('document_email_deliveries')->where('id', $email->id)->update(['status' => 'unknown', 'error_code' => 'delivery_unknown', 'lease_until' => null, 'active_attempt_id' => null, 'updated_at' => now()]);
                             DB::table('document_delivery_attempts')->where('id', $email->active_attempt_id)->update(['status' => 'unknown', 'error_code' => 'delivery_unknown', 'finished_at' => now()]);
                         } elseif ($email->status === 'pending') {
-                            $this->republish($doc->id, 'email', $email->sequence);
+                            EmissionOutbox::republish($doc, 'email', $email->sequence);
                         }
                     }
                 });
             }
         });
-    }
-
-    private function republish(string $document, string $kind, int $generation): void
-    {
-        DB::table('emission_outbox')->where(['document_id' => $document, 'kind' => $kind, 'generation' => $generation])->where('published_at', '<', now()->subSeconds(180))->update(['published_at' => null, 'available_at' => now()]);
     }
 
     /** Only unreferenced attempt files older than one day; retained versions are never deleted. */

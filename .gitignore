@@ -16,6 +16,9 @@
 **/.idea/
 **/.vscode/
 **/.codex/
+!/.codex/
+/.codex/*
+!/.codex/config.toml
 **/.claude/
 **/.agents/
 **/AGENTS.md
@@ -24,11 +27,19 @@
 **/*.sqlite
 **/*.sqlite3
 **/*.sql
+!scripts/recovery/inventory.sql
+!backend/app/Actions/Incidents/operations.sql
+!backend/app/Actions/Customers/statement-movements.sql
+# Platform backup packages and recovery state must stay outside source control.
+revenia-????????T??????Z-????????/
+revenia-????????T??????Z-????????.partial/
+revenia-restore-????????????/
 **/*.dump
 **/*.bak
 **/*.pem
 **/*.key
 **/*.docx
+!docs/ficha/Revenia-v1.5.docx
 **/*.doc
 backend/storage/**
 !backend/storage/**/

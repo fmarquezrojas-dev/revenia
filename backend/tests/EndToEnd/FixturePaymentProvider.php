@@ -4,6 +4,7 @@ namespace Tests\EndToEnd;
 
 use App\Contracts\PaymentGateway;
 use App\Contracts\TaxProvider;
+use App\Services\PaymentReceiver;
 use App\Services\SimulatedTaxProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -36,6 +37,11 @@ class FixturePaymentProvider extends ServiceProvider
         });
         $this->app->bind(PaymentGateway::class, fn () => new class implements PaymentGateway
         {
+            public function forReceiver(PaymentReceiver $receiver): PaymentGateway
+            {
+                return $this;
+            }
+
             public function create(object $order): array
             {
                 return ['id' => '123-'.$order->id, 'url' => 'https://www.mercadopago.com.pe/checkout/v1/redirect?pref_id=123-'.$order->id];

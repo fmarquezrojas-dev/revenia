@@ -1,0 +1,17 @@
+# Solo el visor publica HTTP. PostgreSQL y ops siguen en la red interna.
+services:
+  review:
+    networks: !override [viewer]
+    user: "65534:65534"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./scripts/recovery/viewer-seccomp.json
+    entrypoint: ["php", "-n", "-d", "allow_url_fopen=0", "-d", "display_errors=0", "-S", "0.0.0.0:8080", "/viewer/review.php"]
+networks:
+  viewer:
+    labels:
+      io.revenia.recovery.instance: ${RV_RESOURCE_TOKEN:?}
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
+      com.docker.network.bridge.enable_ip_masquerade: "false"

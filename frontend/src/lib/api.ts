@@ -12,11 +12,13 @@ export interface SessionUser {
 }
 
 interface ErrorPayload {
+  existing_id?: string
   message?: string
   errors?: Record<string, string[]>
 }
 
 export class ApiError extends Error {
+  readonly existingId?: string
   readonly status: number
   readonly errors?: Record<string, string[]>
 
@@ -24,6 +26,7 @@ export class ApiError extends Error {
     super(payload.message ?? 'No se pudo completar la solicitud.')
     this.name = 'ApiError'
     this.status = status
+    this.existingId = payload.existing_id
     this.errors = payload.errors
   }
 }
@@ -85,19 +88,20 @@ export async function prepareCsrf(signal?: AbortSignal): Promise<void> {
 }
 
 export async function getSession(): Promise<SessionUser> {
-  const response = await request<{ data: SessionUser }>('/api/v1/me')
+  const response = await request<{ data: SessionUser }>('/api/v1/me', { cache: 'no-store' })
   return response.data
 }
 
 export async function login(
   email: string,
   password: string,
+  remember?: boolean,
 ): Promise<SessionUser> {
   await prepareCsrf()
 
   await request<void>('/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, remember }),
   })
 
   return getSession()

@@ -61,7 +61,7 @@ export default function SeriesForm({ onSaved, onCancel, onSessionExpired, onSavi
       <p className="muted" id="series-help">Usa 4 letras o números. Factura: F001; boleta: B001;
         nota de crédito para factura: FC01, para boleta: BC01. Se recortan espacios exteriores
         y se convierten letras a mayúsculas. El tipo y el código no podrán modificarse.</p>
-      <p className="muted">Convenciones del simulador. La serie se crea activa y sin emisiones.</p>
+      <p className="muted">La serie se crea activa y sin emisiones.</p>
       {message && <p className="error" role="alert" ref={errorRef} tabIndex={-1}>{message}</p>}
       <div className="form-actions">
         <button type="button" className="secondary" onClick={onCancel}>Cancelar</button>

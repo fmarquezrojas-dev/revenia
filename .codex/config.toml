@@ -1,0 +1,5 @@
+[mcp_servers.revenia]
+command = "powershell.exe"
+args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "RemoteSigned", "-Command", "$repo = git rev-parse --show-toplevel; if ($LASTEXITCODE -ne 0) { exit 1 }; & (Join-Path $repo 'scripts/codex/revenia.ps1'); exit $LASTEXITCODE"]
+startup_timeout_sec = 60
+tool_timeout_sec = 30

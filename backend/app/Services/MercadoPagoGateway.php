@@ -7,35 +7,60 @@ use App\Domain\Money\Currency;
 use App\Domain\Money\Money;
 use App\Domain\Money\ProviderAmount;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
 final class MercadoPagoGateway implements PaymentGateway
 {
+    private ?PaymentReceiver $receiver = null;
+
+    public function forReceiver(PaymentReceiver $receiver): PaymentGateway
+    {
+        $scoped = clone $this;
+        $scoped->receiver = $receiver;
+
+        return $scoped;
+    }
+
+    public static function transportReady(): bool
+    {
+        return (bool) config('payments.enabled') && self::publicHttps((string) config('payments.notification_url'))
+            && self::publicHttps((string) config('payments.return_origin'));
+    }
+
+    public static function notificationUrl(?string $company): string
+    {
+        return rtrim((string) config('payments.notification_url'), '/').($company ? '/companies/'.$company : '');
+    }
+
     public static function configured(): bool
     {
-        return (bool) config('payments.enabled') && is_string(config('payments.access_token')) && strlen(config('payments.access_token')) > 15 && preg_match('/\A[0-9]{1,25}\z/', (string) config('payments.collector_id')) && strlen((string) config('payments.webhook_secret')) >= 16 && self::publicHttps((string) config('payments.notification_url')) && self::publicHttps((string) config('payments.return_origin'));
+        return self::transportReady() && is_string(config('payments.access_token')) && strlen(config('payments.access_token')) > 15 && preg_match('/\A[0-9]{1,25}\z/', (string) config('payments.collector_id')) && strlen((string) config('payments.webhook_secret')) >= 16;
     }
 
     private static function publicHttps(string $url): bool
     {
         $p = parse_url($url);
 
-        return is_array($p) && ($p['scheme'] ?? null) === 'https' && ! isset($p['user']) && ! isset($p['pass']) && ! isset($p['fragment']) && ! isset($p['port']) && str_contains($p['host'] ?? '', '.') && ! filter_var($p['host'], FILTER_VALIDATE_IP) && ! str_ends_with($p['host'], '.local') && $p['host'] !== 'localhost';
+        return is_array($p) && ($p['scheme'] ?? null) === 'https' && ! isset($p['user']) && ! isset($p['pass']) && ! isset($p['fragment']) && ! isset($p['query']) && ! isset($p['port']) && str_contains($p['host'] ?? '', '.') && ! filter_var($p['host'], FILTER_VALIDATE_IP) && ! str_ends_with($p['host'], '.local') && $p['host'] !== 'localhost';
     }
 
     private function client(): PendingRequest
     {
-        if (! self::configured()) {
+        if (! self::transportReady() || ! $this->receiver) {
             throw new \DomainException('payments_not_configured');
         }
 
-        return Http::baseUrl('https://api.mercadopago.com')->withToken(config('payments.access_token'))->acceptJson()->connectTimeout(5)->timeout(15)->withoutRedirecting();
+        return Http::baseUrl('https://api.mercadopago.com')->withToken($this->receiver->token())->acceptJson()->connectTimeout(5)->timeout(15)->withoutRedirecting();
     }
 
     private function get(string $path, array $query = []): array
     {
         $r = $this->client()->get($path, $query);
+        if (in_array($r->status(), [401, 403], true)) {
+            throw new \DomainException('provider_access_denied');
+        }
         if (! $r->successful()) {
             throw new \RuntimeException('provider_unavailable');
         }
@@ -43,20 +68,41 @@ final class MercadoPagoGateway implements PaymentGateway
         return ProviderAmount::decode($r->body());
     }
 
-    /** Verify the configured receiver is a Peruvian test user, not merely a token prefix. */
-    private function testReceiver(): void
+    public static function identify(#[\SensitiveParameter] string $token): array
     {
-        if (! self::configured()) {
-            throw new \DomainException('payments_not_configured');
+        try {
+            $r = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(10)
+                ->withoutRedirecting()->get('https://api.mercadolibre.com/users/me');
+        } catch (ConnectionException) {
+            throw new \RuntimeException('provider_unavailable');
         }
-        $r = Http::withToken(config('payments.access_token'))->acceptJson()->connectTimeout(5)->timeout(10)->withoutRedirecting()->get('https://api.mercadolibre.com/users/me');
-        if (! $r->successful()) {
+        if ($r->serverError() || $r->status() === 429) {
+            throw new \RuntimeException('provider_unavailable');
+        }
+        $user = $r->successful() ? json_decode($r->body(), true, 64, JSON_BIGINT_AS_STRING) : [];
+        $id = (string) ($user['id'] ?? '');
+        if (! preg_match('/\A[0-9]{1,25}\z/', $id) || ($user['site_id'] ?? null) !== 'MPE' || ! is_array($user['tags'] ?? null) || ! in_array('test_user', $user['tags'], true)) {
             throw new \DomainException('test_receiver_unverified');
         }
-        $u = ProviderAmount::decode($r->body());
-        if ((string) ($u['id'] ?? '') !== (string) config('payments.collector_id') || ($u['site_id'] ?? null) !== 'MPE' || ! in_array('test_user', $u['tags'] ?? [], true)) {
-            throw new \DomainException('test_receiver_unverified');
+
+        return ['collector_id' => $id, 'nickname' => mb_substr((string) ($user['nickname'] ?? ''), 0, 160)];
+    }
+
+    private function verifyOrder(object $order): void
+    {
+        if (! $this->receiver) {
+            throw new \DomainException('receiver_unknown');
         }
+        $this->receiver->assertOrder($order);
+        try {
+            if (self::identify($this->receiver->token())['collector_id'] !== $order->collector_id) {
+                throw new \DomainException('test_receiver_unverified');
+            }
+        } catch (\DomainException $e) {
+            $this->receiver->invalidateCredentials();
+            throw $e;
+        }
+        $this->receiver->recordVerification();
     }
 
     public static function checkoutUrl(string $url, string $preference): bool
@@ -77,7 +123,7 @@ final class MercadoPagoGateway implements PaymentGateway
     {
         $id = $p['id'] ?? '';
         $items = $p['items'] ?? [];
-        if (! is_string($id) || ! preg_match('/\A[a-zA-Z0-9-]{1,150}\z/', $id) || ($p['external_reference'] ?? null) !== $order->id || (string) ($p['collector_id'] ?? '') !== (string) config('payments.collector_id') || ($p['site_id'] ?? '') !== 'MPE' || count($items) !== 1 || ($items[0]['currency_id'] ?? '') !== $order->currency || (string) ($items[0]['quantity'] ?? '') !== '1' || ProviderAmount::cents($items[0]['unit_price'] ?? null) !== (int) $order->amount_cents || ! self::checkoutUrl($p['init_point'] ?? '', $id)) {
+        if (! is_string($id) || ! preg_match('/\A[a-zA-Z0-9-]{1,150}\z/', $id) || ($p['external_reference'] ?? null) !== $order->id || (string) ($p['collector_id'] ?? '') !== $this->receiver->collector || ($p['site_id'] ?? '') !== 'MPE' || count($items) !== 1 || ($items[0]['currency_id'] ?? '') !== $order->currency || (string) ($items[0]['quantity'] ?? '') !== '1' || ProviderAmount::cents($items[0]['unit_price'] ?? null) !== (int) $order->amount_cents || ! self::checkoutUrl($p['init_point'] ?? '', $id)) {
             throw new \DomainException('preference_mismatch');
         }
 
@@ -86,9 +132,9 @@ final class MercadoPagoGateway implements PaymentGateway
 
     public function create(object $order): array
     {
-        $this->testReceiver();
+        $this->verifyOrder($order);
         $return = rtrim(config('payments.return_origin'), '/').(! empty($order->subscription_id) ? '/subscription' : '/documents/'.$order->document_id).'?payment_return=1';
-        $payload = ['items' => [['id' => $order->id, 'title' => ! empty($order->subscription_id) ? 'Plan de demostracion '.config('app.name') : 'Comprobante de demostracion', 'quantity' => 1, 'currency_id' => $order->currency, 'unit_price' => '__REVENIA_EXACT_AMOUNT__']], 'external_reference' => $order->id, 'notification_url' => config('payments.notification_url'), 'back_urls' => ['success' => $return, 'failure' => $return, 'pending' => $return], 'expires' => true, 'expiration_date_from' => now()->toIso8601String(), 'expiration_date_to' => CarbonImmutable::parse($order->expires_at)->toIso8601String()];
+        $payload = ['items' => [['id' => $order->id, 'title' => ! empty($order->subscription_id) ? 'Suscripción Revenia · Entorno de pruebas' : 'Pago de comprobante · Entorno de pruebas', 'quantity' => 1, 'currency_id' => $order->currency, 'unit_price' => '__REVENIA_EXACT_AMOUNT__']], 'external_reference' => $order->id, 'notification_url' => self::notificationUrl($this->receiver->company).'?source_news=webhooks', 'back_urls' => ['success' => $return, 'failure' => $return, 'pending' => $return], 'expires' => true, 'expiration_date_from' => now()->toIso8601String(), 'expiration_date_to' => CarbonImmutable::parse($order->expires_at)->toIso8601String()];
         $body = str_replace('"__REVENIA_EXACT_AMOUNT__"', (new Money((int) $order->amount_cents, Currency::from($order->currency)))->decimal(), json_encode($payload, JSON_THROW_ON_ERROR));
         // Preferences creation has no documented idempotency guarantee. Never automatically repeat this POST.
         $response = $this->client()->withBody($body, 'application/json')->post('/checkout/preferences');
@@ -101,7 +147,7 @@ final class MercadoPagoGateway implements PaymentGateway
 
     public function recover(object $order): ?array
     {
-        $this->testReceiver();
+        $this->verifyOrder($order);
         if ($order->preference_id) {
             return $this->preference($this->get('/checkout/preferences/'.rawurlencode($order->preference_id)), $order);
         }
@@ -131,7 +177,7 @@ final class MercadoPagoGateway implements PaymentGateway
             throw new \DomainException('integration_mismatch');
         }
         $m = $this->get('/merchant_orders/'.$merchant['id']);
-        if ((string) ($m['id'] ?? '') !== (string) $merchant['id'] || ($m['external_reference'] ?? null) !== ($p['external_reference'] ?? null) || (string) ($m['collector']['id'] ?? '') !== (string) config('payments.collector_id')) {
+        if ((string) ($m['id'] ?? '') !== (string) $merchant['id'] || ($m['external_reference'] ?? null) !== ($p['external_reference'] ?? null) || (string) ($m['collector']['id'] ?? '') !== $this->receiver->collector) {
             throw new \DomainException('merchant_order_mismatch');
         }
         $p['preference_id'] = $m['preference_id'] ?? null;

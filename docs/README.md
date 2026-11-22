@@ -1,8 +1,14 @@
-# Documentacion de Revenia
+# Documentación de Revenia
 
-## Producto y ejecucion
+## Documentación técnica v1.5
 
-- [Inicio](../README.md), [estado y alcance](ESTADO_PROYECTO.md), [galeria](gallery.md), [presentacion laboral](portfolio.md).
+[Ficha editable en Word](ficha/Revenia-v1.5.docx) · [Ficha en PDF](ficha/Revenia-v1.5.pdf) · [Guía de producto por rol](guia-producto.md) · [Recorrido visual](../README.md#guía-visual-por-tarea)
+
+La [captura de Resumen utilizada en la ficha técnica](images/resumen-cartera.png) corresponde al ensayo de navegador del bloque 11.
+
+## Producto y ejecución
+
+- [Inicio](../README.md), [estado y alcance](ESTADO_PROYECTO.md), [galería histórica](gallery.md), [presentacion laboral](portfolio.md).
 - [Desarrollo local](development.md), [datos demo](DATOS_LOCALES.md), [operacion y recuperacion](operations.md).
 - [Resultados de pruebas](testing/test-report.md), [matriz](testing/acceptance-matrix.md), [limites conocidos](testing/known-issues.md).
 

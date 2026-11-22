@@ -1,0 +1,62 @@
+@media print {
+  .customer-statement {
+    display: block;
+  }
+  .customer-statement > section {
+    margin-top: 12pt;
+  }
+  body:has(.customer-statement) {
+    background: white;
+    color: black;
+  }
+  .workspace:has(.customer-statement),
+  .workspace:has(.customer-statement) .workspace-body {
+    display: block;
+  }
+  .workspace:has(.customer-statement) :is(aside, .workspace-header, .page-heading, .statement-controls) {
+    display: none;
+  }
+  .main-content:has(.customer-statement) {
+    padding: 0;
+  }
+  .customer-statement .surface,
+  .customer-statement .table-region {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .customer-statement .data-table {
+    width: 100%;
+    min-width: 0;
+    font-size: 9pt;
+  }
+  .customer-statement :is(th, td) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    padding: 3pt;
+  }
+  .customer-statement tr,
+  .customer-statement .collection-balances div {
+    break-inside: avoid;
+  }
+  .customer-statement thead {
+    display: table-header-group;
+  }
+  .customer-statement a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .customer-statement h3 {
+    break-after: avoid;
+  }
+  .customer-statement .collection-balances {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .customer-statement:not(.statement-print) > section {
+    display: none;
+  }
+  .customer-statement:not(.statement-print)::after {
+    content: 'Abra «Vista imprimible completa» para imprimir todas las páginas del estado de cuenta.';
+  }
+}

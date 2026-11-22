@@ -14,7 +14,7 @@ Primera compra confirmada: un mes desde la conciliacion. Durante vigencia: un so
 
 RequestIssuance bloquea empresa y documento; consume la capacidad del periodo vigente antes de reservar numero. Registro unico por documento, contador, numero, estado, eventos, idempotencia y outbox quedan en la misma transaccion. Una emision confirmada en base consume, aunque luego sea rechazada. Reintentos tecnicos, repeticiones idempotentes, PDF, correo, pagos, borradores y previews no consumen. Los reintentos terminan una emision ya consumida incluso si posteriormente vence la suscripcion.
 
-Notas de credito: el dominio 07 sigue ausente. No se habilitan ni se declaran exentas de cuota; requieren una decision y pruebas propias antes de incorporarlas. Guardar/editar borradores sigue permitido sin suscripcion o con cuota agotada. Historicos, PDFs, cobranza y renovacion mantienen sus permisos. Vencimiento no desactiva usuario ni empresa.
+Una nota 07 consume una unidad al reservar sus líneas y registrar su primera emisión. Una solicitud en conflicto revierte el consumo. Rechazar una nota libera las líneas y conserva el consumo. Guardar/editar borradores sigue permitido sin suscripcion o con cuota agotada. Historicos, PDFs, cobranza y renovacion mantienen sus permisos. Vencimiento no desactiva usuario ni empresa.
 
 La fecha y capacidad se comprueban en cada primera emision; no depende del scheduler. Cada periodo tiene su propio company_usage y registros emission_consumptions. No se reinician contadores. La auditoria compara contador y numero de registros sin repararlos automaticamente; una discrepancia exige investigacion y reparacion explicita.
 
@@ -86,7 +86,7 @@ Las pruebas usan exclusivamente facturly_testing o una base temporal facturly_se
 
 ## Limites
 
-No se dispone de credenciales sandbox ni URL publica autorizada: flujo externo deshabilitado y ninguna compra externa observada. Solo se valida activacion mediante fixtures/adaptador falso. No se publica ni abre tunel. La prueba externa sigue pendiente y no se declara cerrada. Se conserva la limitacion del dominio de notas de credito, la resolucion contable manual de pagos observados y la ausencia del documento tecnico v1.2 original.
+No se dispone de credenciales sandbox ni URL publica autorizada: flujo externo deshabilitado y ninguna compra externa observada. Solo se valida activacion mediante fixtures/adaptador falso. No se publica ni abre tunel. La prueba externa sigue pendiente y no se declara cerrada. Se conserva la resolucion contable manual de pagos observados y la ausencia del documento tecnico v1.2 original.
 
 ## Resultados observados - 13 de noviembre de 2026
 

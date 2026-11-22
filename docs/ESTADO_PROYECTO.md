@@ -1,21 +1,18 @@
 # Estado del proyecto
 
-Revenia, revision de portafolio del 2026-11-13. Se publica el alcance existente, sin afirmar integracion tributaria real ni uso comercial.
+La candidata de software **v0.1.0-rc.2** reúne el circuito de cobranza y la validación del bloque 11. La edición documental es **1.5**. [Ficha técnica](ficha/Revenia-v1.5.pdf) · [Informe y resultados](testing/test-report.md)
 
-| Area | Estado | Alcance |
+| Área | Evidencia disponible | Validación restante |
 | --- | --- | --- |
-| Sanctum, empresas, usuarios y roles | Implementado y verificado | Sesion, actividad, permisos, limite cinco y ultimo owner |
-| Aislamiento multiempresa | Implementado y verificado | Consultas explicitas, policies, FKs compuestas e IDs ajenos |
-| Clientes, productos y series | Implementado y verificado | Validacion, estados, monedas y contador protegido |
-| Borradores y calculos | Implementado y verificado | Version, snapshots, PEN/USD, 1-50 lineas e importes enteros |
-| Emision e idempotencia | Implementado y verificado | Proveedor simulado, numeracion transaccional y cuota |
-| Outbox y recuperacion | Implementado y verificado | Redis real, lease, interrupcion y resultado tardio |
-| PDF y correo | Implementado y verificado localmente | Dompdf real, descarga privada y SMTP Mailpit; no correo externo |
-| Notas de credito | No implementado | Sin notas 07, reservas ni acreditacion parcial/total |
-| Cobranza | Disponible con limitaciones | Contratos y adaptador interno probados; sandbox externo pendiente |
-| Planes y cuotas | Disponible con limitaciones | Concurrencia y periodos probados; pago externo pendiente |
-| Dashboard y responsive | Implementado y verificado | Moneda, fechas Lima, detalle, permisos y 360/768/1280 px |
-| Dataset demo | Implementado y verificado | Identidades estables y carga repetible |
-| CI | Configurado | Consultar ejecuciones reales en GitHub Actions; no inferir verde del YAML |
+| Sesión, catálogos, roles y empresa | Sanctum, políticas, referencias compuestas y denegación de UUID ajenos en API y MCP | Permisos del operador con sus cuentas |
+| Comprobantes, nota 07, PDF y correo | Emisión simulada, reserva exclusiva, ajuste al aceptar, PDF privado y SMTP en Mailpit | Fiscalidad real fuera del alcance; correo externo por validar |
+| Cobros bancarios y cartera | Abono repartido, reversión, remanente, excesos, PEN/USD y protección frente a distribuciones concurrentes | Conciliación con extractos propios |
+| Seguimiento y Estado de cuenta | Agenda, responsable, compromisos con evidencia de pagos, movimientos del período y saldo actual imprimible | Aceptación por cobranza y contabilidad |
+| Resumen y planes | Actividad por período, posición actual y cuotas. Pagos de suscripción separados del cobro a clientes | Sandbox de plataforma |
+| Incidencias | Historial por operación, recuperación con Redis y trabajador interrumpido, controles por rol | Revisión técnica de resultados inciertos de la instalación |
+| Odoo 18 | Factura, boleta y rectificación en borrador mediante el complemento real de una instancia aislada | Compañía, permisos y correspondencias del operador |
+| Mercado Pago | Contratos probados con proveedor sintético y avisos repetidos | Checkout y webhook externos para comercio y plataforma |
+| MCP | Descubrimiento, tres lecturas autenticadas, aislamiento y revocación | Autorizar la cuenta personal en Codex |
+| Respaldo | Restauración aislada con 8 empresas, 10 saldos y 8 referencias PDF coincidentes | Primer respaldo y recuperación del operador |
 
-Roadmap corto: verificar checkout/webhook sandbox externo; implementar notas y reservas en un bloque propio; preparar despliegue y medir carga representativa. [Testing](testing/test-report.md), [limites](testing/known-issues.md), [CHANGELOG](../CHANGELOG.md).
+Los siguientes hitos son la aceptación con usuarios propios, las pruebas de proveedores y la evaluación de seguridad, carga, secretos y supervisión para un despliegue comercial. [Limitaciones conocidas](testing/known-issues.md)

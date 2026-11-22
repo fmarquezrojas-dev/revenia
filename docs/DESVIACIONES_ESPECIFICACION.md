@@ -2,7 +2,7 @@
 
 La [matriz de estado](ESTADO_PROYECTO.md) es la referencia vigente.
 
-- Notas de credito: no existen dominio 07, reservas ni acreditacion. El dashboard informa esa ausencia y no calcula emision neta con notas.
+- Las notas 07 admiten devoluciones de líneas completas con los importes históricos de una factura o boleta aceptada. Las fracciones de línea, los descuentos libres y el reembolso de dinero quedan fuera del bloque. El exceso se conserva en la cartera para revisión.
 - Emision: proveedor local simulado, sin conexion/certificacion SUNAT ni validez tributaria.
 - Cobranza: adaptador sandbox y contratos disponibles, pero checkout y webhook externos no verificados con una cuenta autorizada. La prueba interna usa un gateway sintetico.
 - Suscripciones: planes ficticios, periodo mensual y pago unico. No hay debito recurrente, prorrateo ni devoluciones automaticas.
