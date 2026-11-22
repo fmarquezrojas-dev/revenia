@@ -10,11 +10,11 @@ Revenia es una plataforma de facturación y cobranza para empresas. Permite prep
 - Full stack: [editor](../frontend/src/components/DocumentEditor.tsx), [dashboard](../frontend/src/components/DashboardPanel.tsx), [pruebas React](../frontend/src/components/DashboardPanel.test.tsx).
 - Entrega reproducible: [Docker](../compose.yaml), [CI](../.github/workflows/ci.yml), [pruebas de recuperación](../scripts/test-integral-recovery.cjs).
 
-## Tres decisiones para explicar en entrevista
+## Decisiones de diseño
 
-1. Por qué guardar un borrador no asigna número, y qué filas se bloquean cuando dos solicitudes intentan consumir el último cupo.
-2. Qué ocurre entre un commit exitoso y un Redis no disponible, y por qué la idempotencia del negocio no significa entrega exactamente una vez.
-3. Por qué un timeout después de aceptación necesita consulta y conciliación, en lugar de un reenvío inmediato.
+1. La numeración y el consumo de cuota se reservan al solicitar la primera emisión. La transacción serializa las solicitudes que compiten por el último cupo.
+2. El outbox guarda la solicitud en PostgreSQL. Si Redis queda fuera de servicio, el publicador puede recuperar después la misma operación.
+3. Ante una respuesta externa incierta, el trabajador consulta la identidad de la operación antes de intentar otro envío.
 
 Cada decisión tiene alternativas y costes en [decisiones técnicas](architecture/decisions.md).
 
