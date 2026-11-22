@@ -1,6 +1,6 @@
 # Galería histórica de Revenia
 
-Estas capturas corresponden a una versión anterior. Conservan textos, navegación y datos de ese momento. La versión actual incorpora Cobros, el seguimiento de conciliaciones y las condiciones de pago.
+La [guía visual del README](../README.md#guía-visual-por-tarea) muestra la candidata actual. Estas capturas corresponden a una versión anterior. Conservan textos, navegación y datos de ese momento. La versión actual incorpora Cobros, el seguimiento de conciliaciones y las condiciones de pago.
 
 ## Resumen
 ![Dashboard](images/dashboard.png)

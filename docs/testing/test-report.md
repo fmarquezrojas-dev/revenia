@@ -1,5 +1,17 @@
 # Verificacion del alcance de portafolio
 
+## Bloque 12 · instalación pública y documentación
+
+La huella de los 470 archivos de la candidata coincidió con la registrada en el bloque 11 antes del cierre editorial. El commit `c7622aff0ef12da80e310716f98897c68899cbbe` reúne esos cambios y el informe. La instalación pública se ejecutó desde un checkout nuevo en un runner desechable de GitHub, con los archivos de bloqueo de la candidata y 23 migraciones. Se comprobó el acceso por sesión, cartera, agenda, Tesorería, Incidencias, suscripción, Estado de cuenta y el conector Odoo desactivado. [Ejecución de instalación y suites en la rama de entrega](https://github.com/fmarquezrojas-dev/revenia/actions/runs/44974842465).
+
+La primera comprobación HTTP solicitaba JSON al cargar la página HTML de Vite. Se corrigió la cabecera del verificador y se repitió la instalación completa. La edición técnica 1.5 contiene 12 capítulos con índice enlazado, 12 tablas editables y 14 páginas en el PDF. Los resultados de CI de cada revisión se consultan por SHA. [Workflow](../../.github/workflows/ci.yml) · [Ficha PDF](../ficha/Revenia-v1.5.pdf)
+
+En una ejecución intermedia el navegador E2E llegó a `/acceso` con el cuerpo vacío y agotó la espera. El contenedor E2E sirve ahora el frontend compilado por la propia prueba mediante `vite preview`. El job de instalación limpia sigue verificando el servidor de desarrollo que utiliza el operador. [Ejecución intermedia](https://github.com/fmarquezrojas-dev/revenia/actions/runs/44976074982)
+
+### Procedencia del recorrido visual
+
+El job manual `clean-install` preparó una empresa sintética en Compose y capturó 35 vistas en Chrome con el conector Odoo y los pagos externos desactivados. El README incorpora además una vista del PDF público de ejemplo, el JSON de las consultas MCP autenticadas y el visor de recuperación con el informe conservado del laboratorio. Las imágenes WebP conservan los píxeles originales. En el recorrido bancario, la última distribución de 20,00 PEN se muestra como propuesta. [Capturas y escenarios](../../scripts/gallery) · [Ejecución de captura](https://github.com/fmarquezrojas-dev/revenia/actions/runs/44976349339) · [Guía visual](../../README.md#guía-visual-por-tarea)
+
 ## Bloque 11 · validación de la candidata del 21 de noviembre de 2026
 
 **Decisión: lista con limitaciones documentadas.** El ensayo cubrió PostgreSQL, la recuperación con PDF privados, la cobranza entre módulos y el conector contra Odoo Community. Quedan pendientes Mercado Pago en su sandbox externo y la aceptación del operador con sus usuarios, datos y claves. La emisión fue simulada. La publicación en GitHub corresponde al bloque 12.
@@ -110,7 +122,7 @@ Rama local `feature/notas-credito-simuladas`. Las notas devuelven líneas comple
 
 El pago tardío se prueba con un checkout abierto antes de emitir la nota y una confirmación aprobada posterior. Se conserva el importe validado y el exceso aparece en la cartera para revisión. La respuesta perdida se reproduce con `timeout_after`. La recuperación consulta la misma identidad y aplica la reserva una vez.
 
-[Reproducir la devolución en la web](../../README.md#demo-de-devolución-por-s-236) · [Captura del dashboard en el E2E](../images/nota-credito-dashboard.png) · [Límites vigentes](known-issues.md).
+[Reproducir la devolución en la web](../guia-producto.md#reproducir-la-devolución-de-236-pen) · [Captura del dashboard en el E2E](../images/nota-credito-dashboard.png) · [Límites vigentes](known-issues.md).
 
 ## Evidencia anterior al bloque de notas 07
 

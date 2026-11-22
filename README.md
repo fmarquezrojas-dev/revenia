@@ -1,191 +1,260 @@
 # Revenia
 
-**Plataforma de facturación y cobranza para empresas.** Prepara facturas y boletas en PEN o USD, consulta lo que debe cada cliente y sigue los pagos de cada comprobante. Cada empresa tiene su catálogo, sus series y su cuenta receptora.
+Revenia ayuda a equipos de facturación, cobranza y contabilidad a explicar **cuánto debe cada cliente hoy y qué movimientos explican ese saldo**. Una factura aceptada conserva su importe original. Desde ella se pueden seguir la nota de crédito, el abono bancario, su distribución y cualquier reversión hasta el estado de cuenta, en PEN o USD.
 
-## Acceso
+[Recorrido de una venta](#recorrido-del-comprobante-al-estado-de-cuenta) · [Capturas por funcionalidad](#guía-visual-por-tarea) · [Instalar en local](#instalación-local) · [Ficha técnica en PDF](docs/ficha/Revenia-v1.5.pdf) · [Word editable](docs/ficha/Revenia-v1.5.docx)
 
-Abre la interfaz local en `http://localhost:5173`. En **Inicia sesión**, usa tu correo y contraseña y pulsa **Ingresar**. El navegador puede guardar y autocompletar las credenciales. **Mantener mi sesión en este dispositivo** permite a Laravel restaurar una sesión autorizada. Al volver desde un enlace interno, Revenia recupera la pantalla y comprueba los permisos. **Cerrar sesión** invalida el recuerdo en ese navegador.
+[![Resumen de Revenia con las secciones Comprobantes, Cuentas por cobrar, Incidencias y Cobros bancarios y los indicadores de emisión del período](docs/images/recorrido/resumen.webp)](docs/images/recorrido/resumen.webp)
 
-## Navegación
+*Resumen de Demo Alfa. La actividad del período separa emisión bruta, notas aceptadas, emisión neta y dinero cobrado.*
 
-| Sección | Pantallas |
+## Recorrido del comprobante al estado de cuenta
+
+| Etapa en Revenia | Qué puede comprobar el evaluador |
 | --- | --- |
-| Operación | **Resumen**, **Comprobantes**, **Cuentas por cobrar**, **Incidencias**, **Clientes**, **Productos y servicios** |
-| Tesorería | **Cobros bancarios** |
-| Configuración | **Integraciones**, **Cobros**, **Mi empresa**, **Usuarios**, **Series**. Disponibles para el dueño |
-| Cuenta | **Plan y consumo**, **Mi cuenta** |
+| [1. Comprobantes](docs/guia-producto.md#facturación) | Guarde una factura como borrador y confirme su emisión. El número y la cuota se consumen al solicitar la emisión. Tras la aceptación puede abrir el PDF privado. La emisión tributaria es **simulada**, sin validez ante SUNAT. |
+| [2. Cuentas por cobrar](docs/guia-producto.md#cuentas-por-cobrar) | Localice el documento por cliente y moneda. En **Seguimiento** consulte su responsable, próxima acción y compromiso. El compromiso comercial conserva el saldo y el vencimiento originales. |
+| [3. Tesorería → Cobros bancarios](docs/guia-producto.md#tesorería--cobros-bancarios) | Registre y confirme manualmente un abono, identifique al cliente y distribuya su importe. Cada factura recibe su parte. Una reversión devuelve disponible al mismo abono y deja evidencia. |
+| [4. Nota de crédito](docs/guia-producto.md#facturación) | Desde el documento aceptado, seleccione líneas completas. La solicitud reserva las líneas. La aceptación de la nota reduce la deuda y queda enlazada al original. |
+| [5. Clientes → Estado de cuenta](docs/guia-producto.md#estado-de-cuenta-por-cliente) | Compare los saldos por comprobante y abra sus movimientos. La consulta e impresión distinguen deuda, exceso y abonos disponibles. El período filtra los movimientos y el saldo se calcula al consultar. |
 
-En **Resumen**, la actividad del periodo muestra las ventas, notas de crédito y pagos confirmados. La cartera actual se consulta por moneda, con independencia del periodo elegido.
+**Un caso comprobado.** Dos facturas de 50,00 PEN recibieron 25,00 y 50,00 de un único abono de 90,00 PEN. Al revertir la primera aplicación quedaron 50,00 PEN de deuda y 40,00 PEN disponibles en el abono. Detalle, cartera y estado de cuenta coincidieron. [Informe de validación](docs/testing/test-report.md)
 
-## Facturación
+## Guía visual por tarea
 
-1. En **Comprobantes**, el dueño o emisor pulsa **Nuevo comprobante**, elige factura o boleta y selecciona serie, cliente, moneda y productos. **Guardar borrador** conserva las líneas sin consumir un número.
-2. En **Condición de pago**, **Contado** vence en la fecha de emisión. **Crédito** requiere un vencimiento igual o posterior. Al iniciar la emisión se fijan los datos del comprobante.
-3. Desde el detalle, pulsa **Emitir comprobante** y **Confirmar emisión**. Sigue el estado del envío y, cuando se acepte, consulta **PDF privado y correo**.
-4. En una factura o boleta aceptada, **Crear nota de crédito** permite seleccionar líneas completas e indicar el motivo. La emisión reserva las líneas y la aceptación reduce el saldo del documento de origen.
+Las capturas proceden de Chrome sobre una instalación desechable con datos sintéticos de **Demo Alfa**. Abra el recorrido que le interese y pulse en una imagen para leerla a tamaño completo. La vista de impresión y los movimientos corresponden al mismo cliente y moneda.
 
-Los comprobantes, sus PDF y el correo identifican la **Emisión tributaria simulada**. El proveedor local aplica reglas simplificadas. Los documentos carecen de validez tributaria y la plataforma no los presenta a SUNAT.
+[Acceso, resumen y catálogos](#acceso-y-catalogos) · [Del borrador a la entrega](#facturacion-y-entrega) · [Cartera, seguimiento y compromisos](#cartera-y-agenda) · [Tesorería y distribución de abonos](#tesoreria-bancaria) · [Estado de cuenta e impresión](#consulta-del-cliente) · [Incidencias e integraciones](#incidencias-y-conexiones) · [Administración de empresa y cuenta](#empresa-y-cuenta)
 
-## Cuentas por cobrar
+<a id="acceso-y-catalogos"></a>
 
-En **Cuentas por cobrar**, busca por cliente o número, elige PEN o USD y filtra por vencimiento. El corte usa America/Lima. Las tarjetas resumen toda la selección y los tramos de atraso abren sus comprobantes. Las ventas históricas sin fecha figuran como **Sin vencimiento informado**. **Saldo pendiente actual** en **Resumen** abre la cartera en la moneda seleccionada.
+### Acceso, resumen y catálogos
 
-En **Vista de cobranza**, **Pendientes de confirmación** y **Por revisar** reúnen las operaciones que necesitan seguimiento, incluso cuando su comprobante ya está saldado. El número abre el detalle. Los créditos aceptados y los pagos aplicados reducen el saldo. Las reservas pendientes y los excesos conservan su tratamiento financiero.
+Empiece en **Resumen**. El selector de moneda permite leer por separado las operaciones en PEN y USD. **Clientes** identifica al receptor de la venta y **Productos y servicios** proporciona los artículos para el borrador.
 
-### Estado de cuenta por cliente
+<details>
+<summary>Ver las 5 imágenes de acceso, resumen y catálogos</summary>
 
-En **Clientes**, abre la ficha y selecciona **Estado de cuenta**. Desde **Cuentas por cobrar** puedes elegir un cliente con **Estado de cuenta por cliente** o abrir el enlace de una fila. El dueño, el emisor y el contador activos pueden consultar e imprimir los datos de su empresa, incluso si el cliente está inactivo.
+**Iniciar sesión.** El usuario entra con su correo. La sesión determina la empresa y las opciones que puede abrir.
 
-Elige **PEN** o **USD**. El encabezado indica la hora de cálculo en **America/Lima**. Tanto el resumen como los comprobantes y abonos disponibles muestran la posición actual completa en esa moneda. **Movimientos desde / Hasta** filtra únicamente la cronología por días inclusivos. La consulta inicial abarca desde el primer día del mes hasta hoy. **Ver movimientos** permite seguir un solo comprobante. **Vista imprimible completa** incluye todas las páginas en una nueva lectura consistente y conserva el período y el comprobante elegidos.
+[![Iniciar sesión en Revenia](docs/images/recorrido/acceso.webp)](docs/images/recorrido/acceso.webp)
 
-| Cifra | Fuente y alcance |
-| --- | --- |
-| Saldo pendiente y parte vencida | Facturas y boletas aceptadas asociadas al cliente. De cada total original se descuentan sus notas aceptadas y pagos aplicados. Se suman los saldos positivos. Se considera vencido el saldo con vencimiento anterior a hoy en Lima. |
-| Créditos y reservas | La emisión mantiene las líneas históricas acreditadas y las reservadas. Solo las acreditadas reducen la deuda. La cronología usa la emisión de la nota para la reserva y el evento de aceptación para el crédito. |
-| Pagos aplicados | Cartera y Resumen consultan los pagos aplicados del proveedor y las aplicaciones bancarias vigentes. La cronología identifica la confirmación registrada de Mercado Pago, la solicitud de orden y el estado actual de esa orden. Cada distribución bancaria muestra su propia porción y enlaza al abono original. Una reversión se fecha por separado. |
-| Excesos y comprobantes en revisión | El exceso se calcula por comprobante cuando el importe pagado supera el neto. Permanece separado de las demás deudas. La revisión usa las mismas señales financieras que Cuentas por cobrar. |
-| Abonos disponibles por aplicar | Tesorería aporta el remanente de abonos directos confirmados e identificados a ese cliente. Los abonos por identificar, las liquidaciones de Mercado Pago y las suscripciones quedan fuera. |
+**Resumen en móvil.** El menú plegable libera espacio para filtrar por fecha y moneda en una pantalla estrecha.
 
-**Seguimiento** abre el contexto comercial del comprobante. Los compromisos no descuentan deuda. El proveedor conserva la fecha de confirmación y el importe aplicado vigente, pero su conciliación actualiza la fila del pago. Esta versión ofrece saldo actual y movimientos fechados, sin emitir saldos históricos a una fecha de corte. La consulta y la impresión leen PostgreSQL sin comunicarse con proveedores. El bloque utiliza el esquema existente.
+[![Resumen en móvil en Revenia](docs/images/recorrido/movil.webp)](docs/images/recorrido/movil.webp)
 
-### Seguimiento de cobranza y compromisos de pago
+**Buscar un cliente.** Busque por nombre o documento y utilice **Ver detalle** para abrir su ficha.
 
-Abre **Seguimiento** desde una fila de **Cuentas por cobrar** o desde el detalle de una factura o boleta aceptada. La ficha reúne saldo vigente, créditos aceptados, pagos aplicados, vencimiento original, responsable, próxima acción, última gestión e historial. Puedes consultar una ficha saldada desde **Comprobantes**.
+[![Buscar un cliente en Revenia](docs/images/recorrido/clientes.webp)](docs/images/recorrido/clientes.webp)
 
-| Rol activo | Acceso al seguimiento |
-| --- | --- |
-| Dueño | Consulta ambas agendas y todas las fichas de su empresa. Asigna o retira responsables, registra y corrige gestiones, crea, reprograma, cancela y confirma compromisos. |
-| Emisor | Consulta fichas de su empresa y **Mi agenda**. Puede gestionar únicamente los comprobantes que el dueño le asignó expresamente. |
-| Contador | Consulta fichas, historial y **Agenda del equipo** en modo de lectura. |
+**Ficha del cliente.** Desde una misma ficha se llega al estado de cuenta y a los cobros bancarios identificados para ese cliente.
 
-El dueño puede elegir a otro dueño o a un emisor activo de la misma empresa. Un responsable desactivado o que pasa al rol contador conserva su historial. El documento aparece en **Requieren responsable** hasta la reasignación. Cada gestión registra canal, resultado, observación, próxima acción, autor y hora del servidor. Para rectificarla, abre **Corregir gestión** en el historial e indica el motivo. La ficha conserva el registro original y la corrección. El usuario realiza la comunicación por su cuenta. Las observaciones se consultan dentro de Seguimiento.
+[![Ficha del cliente en Revenia](docs/images/recorrido/ficha-cliente.webp)](docs/images/recorrido/ficha-cliente.webp)
 
-**Compromisos.** Introduce un importe positivo en la moneda del documento, hasta el saldo vigente, y la fecha acordada. Hay un solo compromiso activo por comprobante. Si dos personas modifican la misma ficha a la vez, la segunda debe actualizarla antes de guardar. Al reprogramar, indica el **nuevo importe pendiente** y el motivo. El total del acuerdo pasa a ser lo ya acreditado más ese pendiente. Las fechas e importes anteriores quedan en el historial.
+**Productos y servicios.** El catálogo muestra código, precio sin IGV, moneda, afectación y estado. Los cambios posteriores en el catálogo conservan las líneas históricas emitidas.
 
-**Cumplimiento.** Revenia acredita pagos aprobados, confirmados después de abrir el acuerdo, aplicados al mismo documento y moneda, sin reembolso ni revisión. Los pagos que ya estaban aplicados al registrar el compromiso quedan excluidos. Una reprogramación mantiene el inicio original y vuelve a calcular la evidencia. **Confirmar cumplimiento** comprueba los pagos nuevamente y guarda cuánto aportó cada uno. Si un ajuste posterior invalida esa evidencia, el cierre histórico muestra **en revisión**. Los créditos aceptados reducen la cartera y pueden requerir revisar el acuerdo. El acuerdo conserva por separado el dinero acreditado y el importe pendiente. Crear o cerrar un compromiso conserva los importes financieros y el vencimiento del comprobante.
+[![Productos y servicios en Revenia](docs/images/recorrido/productos.webp)](docs/images/recorrido/productos.webp)
 
-En **Cuentas por cobrar → Mi agenda / Agenda del equipo**, filtra por cliente, moneda, fechas de acción o compromiso y, en la vista de equipo, por responsable. Cada indicador abre su listado con los mismos filtros. Las acciones para hoy y los atrasos usan **America/Lima**. Un compromiso vence al pasar la fecha acordada si todavía queda importe por cubrir. La agenda muestra una fila por comprobante con saldo positivo y páginas de 20 documentos.
+</details>
 
-Para habilitar el módulo, respalda primero la instalación y aplica las migraciones pendientes desde la raíz con `docker compose exec -T app php artisan migrate`. El seguimiento incorpora `2026_11_21_000001_add_collection_follow_up.php` y utiliza PostgreSQL local.
+<a id="facturacion-y-entrega"></a>
 
-## Tesorería → Cobros bancarios
+### Del borrador a la entrega
 
-El dueño configura las **Cuentas receptoras** mediante alias, entidad financiera, moneda y estado. La moneda se fija al crear la cuenta. Desactivarla impide registrar nuevos ingresos y permite terminar de gestionar los históricos. Revenia conserva la referencia a la cuenta y prescinde de números de cuenta, claves y conexiones bancarias.
+En **Comprobantes** se crea la factura o boleta, se consulta su aceptación y se abre el documento original de una nota. La emisión opera con el simulador tributario local.
 
-| Rol | Operaciones |
-| --- | --- |
-| Dueño | Administra cuentas, registra y confirma abonos, identifica clientes, distribuye importes y revierte aplicaciones. |
-| Emisor | Consulta tesorería y registra abonos pendientes con o sin cliente identificado. |
-| Contador | Consulta la bandeja, las aplicaciones, los remanentes y su historial. |
+<details>
+<summary>Ver las 6 imágenes de del borrador a la entrega</summary>
 
-1. En **Registrar abono**, selecciona la cuenta y el origen, e indica transferencia o depósito, fecha bancaria, referencia e importe. La observación es opcional. La **verificación bancaria es manual**. El dueño contrasta el extracto y pulsa **Confirmar ingreso bancario**. El detalle distingue fecha efectiva, registro y confirmación e identifica a sus autores en el historial.
-2. Para un pago directo confirmado, identifica al cliente y abre **Distribuir abono**. Elige hasta 50 facturas o boletas aceptadas de ese cliente y moneda. Puedes cubrirlas total o parcialmente y conservar un remanente. Al confirmar, el servidor bloquea el abono y los comprobantes, vuelve a calcular sus saldos y descuenta las reservas de crédito. Si algún documento tiene confirmación o revisión pendiente, o si algún importe excede lo disponible, rechaza la distribución completa.
-3. La referencia se contrasta dentro de la cuenta receptora ignorando diferencias de mayúsculas y espacios repetidos. Un registro exacto abre el abono existente. Si los datos difieren, la interfaz ofrece **Revisar abono existente** y conserva los importes originales. Las liquidaciones de Mercado Pago tienen su propio origen y únicamente representan el ingreso en banco. Las suscripciones de la plataforma siguen en **Plan y consumo**.
-4. En el detalle, **Revertir aplicación** solicita un motivo. La reversión identifica al autor, la fecha y la aplicación original. Devuelve el importe al disponible y recalcula la deuda. Es una corrección interna. Si el cliente fue identificado por error, el dueño puede cambiarlo cuando haya revertido todas las aplicaciones vigentes. La ficha del cliente enlaza su bandeja y el comprobante enlaza sus aplicaciones bancarias.
+**Buscar un comprobante.** Filtre por tipo, estado, fecha o cliente. Un fallo técnico y una aceptación del simulador tienen estados distintos.
 
-**Indicadores por moneda.** En **Resumen**, los ingresos bancarios confirmados se cuentan una sola vez por abono, según su fecha bancaria, e incluyen las liquidaciones identificadas por separado. El importe bancario aplicado muestra las aplicaciones vigentes según la fecha de distribución en America/Lima. El disponible por aplicar suma hoy los remanentes de abonos directos confirmados de cualquier fecha, incluidos los pendientes de identificar. Cartera, dashboard y las tres herramientas MCP comparten la misma fuente de pagos vigentes.
+[![Buscar un comprobante en Revenia](docs/images/recorrido/comprobantes.webp)](docs/images/recorrido/comprobantes.webp)
 
-**Compromisos.** Una aplicación bancaria aporta únicamente el importe asignado a ese comprobante. Tanto la confirmación manual del ingreso como la aplicación deben ser posteriores al inicio del compromiso, y su fecha bancaria debe ser el mismo día del acuerdo o posterior en Lima. Un abono pendiente, una liquidación o un remanente no acreditan el compromiso. Revertir una aplicación retira su evidencia y permite revisar el acuerdo o el cumplimiento histórico afectado.
+**Preparar la venta.** Seleccione tipo, moneda, serie, condición de pago, cliente y productos. Guardar el borrador conserva estos datos para completarlos después.
 
-La migración `2026_11_21_000002_add_bank_receipts.php` sigue a la de Seguimiento. Desde la raíz y después del respaldo, `docker compose exec -T app php artisan migrate` aplica las migraciones pendientes. El módulo reutiliza Laravel, PostgreSQL y React.
+[![Preparar la venta en Revenia](docs/images/recorrido/borrador.webp)](docs/images/recorrido/borrador.webp)
 
-## Pagos y conciliación
+**Leer la factura aceptada.** La factura FR01-00000001 conserva sus dos líneas y el importe original de 1.180,00 PEN. Sus cobros se consultan en el mismo detalle.
 
-| Operación | Quién recibe el pago | Quién la gestiona |
-| --- | --- | --- |
-| Pago de factura o boleta en PEN | La cuenta de la empresa emisora vinculada en **Configuración → Cobros** | Dueño y emisor crean enlaces. El dueño solicita conciliación. El contador consulta |
-| Contratación o renovación en **Plan y consumo** | La cuenta de la plataforma Revenia | El dueño contrata o renueva. Todos los roles pueden consultar el consumo |
+[![Leer la factura aceptada en Revenia](docs/images/recorrido/factura.webp)](docs/images/recorrido/factura.webp)
 
-**Entorno de pruebas.** El adaptador utiliza Checkout Pro de Mercado Pago Perú. El dueño registra el Access Token de su vendedor de pruebas y la clave de firma de su aplicación en **Cobros**. **Verificar y vincular** comprueba la identidad y muestra el identificador del receptor y la fecha de verificación. La pantalla muestra la URL de Webhooks de la empresa cuando el entorno está listo. Una conexión puede desactivarse o sustituirse. Las órdenes conservan su receptor original.
+**Rastrear la devolución.** La nota FC01-00000001 enlaza a la otra factura de la muestra, FR01-00000002. Devuelve una línea completa por 236,00 PEN, incluido IGV.
 
-En **Comprobantes → Cobranza**, **Crear enlace de pago** solicita un enlace por el saldo vigente. **Solicitar conciliación** consulta las órdenes recientes en Mercado Pago. **Conciliar esta orden** consulta una referencia concreta. **Actualizar cobranza** muestra el estado, la referencia y las incidencias. El regreso del checkout consulta el historial disponible. La acreditación requiere una respuesta del proveedor que corresponda al receptor, referencia, preferencia, importe, moneda y entorno de la orden.
+[![Rastrear la devolución en Revenia](docs/images/recorrido/nota-credito.webp)](docs/images/recorrido/nota-credito.webp)
 
-La verificación externa del cobro y la entrega de un webhook firmado sigue pendiente. Requiere cuentas de prueba y una URL HTTPS autorizada. [Configuración de cobros](docs/COBRANZA.md) · [Notificaciones de Checkout Pro](https://www.mercadopago.com.pe/developers/es/docs/checkout-pro-preferences/payment-notifications).
+**PDF privado y correo.** El panel comunica la disponibilidad del PDF y las opciones de correo para el rol y el destinatario. En la instalación de demostración, Mailpit permite comprobar la recepción SMTP.
 
-## Incidencias
+[![PDF privado y correo en Revenia](docs/images/recorrido/pdf-correo.webp)](docs/images/recorrido/pdf-correo.webp)
 
-Abre **Operación → Incidencias** o selecciona una alerta de **Resumen → Atención operativa**. La alerta conserva moneda y fechas de última actualización, en hora de Lima. La bandeja permite buscar por número de comprobante, referencia de envío, orden o pago y filtrar por proceso y situación. **Requieren atención** es la vista inicial. **En proceso** y **Resuelta en origen** permiten seguir una recuperación.
+**Leer el documento descargable.** Esta factura sintética de archivo ilustra el PDF entregado al receptor. Además de las líneas y el IGV, el propio documento indica que la emisión es simulada. [Abrir el PDF de ejemplo](docs/examples/revenia-invoice.pdf)
 
-| Proceso | Qué alimenta la cronología | Recuperación |
-| --- | --- | --- |
-| Emisión de facturas, boletas y notas de crédito | Estado del comprobante, eventos de emisión e intentos de publicación en cola | Dueño y emisor pueden recuperar un fallo habilitado. El trabajador consulta primero la referencia original del simulador |
-| Generación de PDF | Estado y versión del PDF, solicitudes e intentos de generación | El dueño puede regenerar el PDF cuando corresponde un reintento manual |
-| Entrega de correo | Solicitudes, intentos de entrega y comprobaciones del transporte, agrupados por comprobante | Dueño y emisor pueden solicitar otro envío tras un fallo confirmado, con PDF disponible y dentro de los límites. Un resultado incierto requiere comprobación técnica del transporte |
-| Transferencia a Odoo | Outbox de cada comprobante, intentos, comprobación del borrador y destino autorizado | El dueño puede recuperar una transferencia mediante su clave. Las notas de crédito esperan al original en la misma compañía |
-| Cobranza de clientes | Orden, trabajos de conciliación, auditoría y estados informados por Mercado Pago | El dueño puede conciliar la orden identificada cuando el dominio lo permite. La orden conserva el receptor original |
+[![Leer el documento descargable en Revenia](docs/images/recorrido/muestra-pdf.webp)](docs/images/recorrido/muestra-pdf.webp)
 
-Una notificación autenticada del comercio que aún no tiene orden ni moneda confirmadas aparece en la bandeja sin filtro de moneda. Operación técnica investiga la referencia. La bandeja enlaza el comprobante cuando el sistema confirma la correspondencia.
+</details>
 
-Los tres roles activos consultan su empresa. Dueño y emisor pueden **Registrar revisión**. La cronología identifica al solicitante y el resultado de la solicitud. Solo el proceso de origen determina la resolución. La fecha de envío de un correo indica aceptación por el transporte. Los vencimientos siguen en **Cuentas por cobrar** y las suscripciones en **Plan y consumo**.
+<a id="cartera-y-agenda"></a>
 
-**Reintento automático** muestra el siguiente intento programado. **Demorada** requiere que haya vencido el plazo registrado de un trabajador (90 segundos), o que una publicación de emisión, PDF o correo siga esperando ejecución después de 180 segundos. Un pendiente ordinario figura **En proceso**. La bandeja y el detalle consultan el historial local. Horizon y la verificación de correos inciertos siguen bajo control de operación técnica.
+### Cartera, seguimiento y compromisos
 
-## Configuración → Integraciones → Odoo
+En **Cuentas por cobrar** identifique quién debe, cuánto y desde cuándo. En **Seguimiento** registre lo acordado. Solo los pagos confirmados y aplicados después del acuerdo cubren el importe comprometido.
 
-Revenia transfiere facturas y boletas aceptadas a facturas de cliente en borrador de **Odoo Community 18.0**. Las notas de crédito aceptadas se crean como rectificativas en borrador, vinculadas al original por su ID de Odoo. Se conservan la numeración de Revenia, el cliente histórico, las líneas, moneda, impuestos e importes. La aceptación tributaria simulada en Revenia y la revisión contable en Odoo son estados independientes.
+<details>
+<summary>Ver las 6 imágenes de cartera, seguimiento y compromisos</summary>
 
-1. Aplica las migraciones locales e instala en tu Odoo el módulo de Facturación (`account`) y el [módulo de Revenia](integrations/odoo/revenia_bridge). La [guía local](docs/ODOO.md) incluye un perfil Docker opcional para Odoo con base propia. Prepara el diario, la cuenta de ingresos, las monedas, unidades, clientes e impuestos de la compañía. Usa un usuario técnico con acceso de facturación a esa compañía y una clave API.
-2. El administrador de despliegue autoriza el destino y su base mediante `ODOO_ENDPOINTS` y activa `ODOO_ENABLED` en el entorno del backend. Ambos vienen desactivados o vacíos. Recarga la configuración de Laravel, el trabajador y el planificador.
-3. En **Configuración → Integraciones**, el dueño copia el UUID de Revenia al campo **UUID de empresa en Revenia** de la compañía en Odoo. Selecciona el destino, indica el ID de compañía, usuario y clave, y pulsa **Verificar y guardar**. Revisa el nombre de la compañía obtenido del servidor.
-4. Registra las **Correspondencias** por sus IDs estables y pulsa **Habilitar transferencias**. Las próximas aceptaciones entran en cola. Para un comprobante histórico aceptado, el dueño puede abrir el detalle y pulsar **Transferir este comprobante**.
-5. En **Comprobantes → Transferencia a Odoo** se muestran el último resultado, la compañía y el ID del documento externo. En **Incidencias → Transferencia a Odoo** se investiga la misma operación. El dueño configura, autoriza cambios de destino y solicita la recuperación. Emisor y contador consultan el resultado. El emisor conserva su permiso general para registrar una revisión en Incidencias.
+**Cartera actual por moneda.** Las tarjetas agrupan saldos por vencimiento. El plazo original sigue determinando el atraso después de que el cliente prometa pagar.
 
-El conector crea únicamente borradores. La contabilización, el inventario y la emisión tributaria externa quedan fuera de la transferencia. La validación funcional con una instalación real de Odoo está pendiente. [Instalación, estados y recuperación](docs/ODOO.md).
+[![Cartera actual por moneda en Revenia](docs/images/recorrido/cartera.webp)](docs/images/recorrido/cartera.webp)
 
-## Respaldo y restauración
+**Explicar cuánto queda de una factura.** FR01-00000001 tiene 1.000,00 PEN de pago confirmado del proveedor sintético y 100,00 PEN de aplicación bancaria. Sobre sus 1.180,00 PEN quedan 80,00 PEN.
 
-Antes de aplicar migraciones, el operador puede copiar PostgreSQL y los archivos privados y abrir una revisión aislada en Windows. La guía incluye la pausa de escritura, la custodia de la clave, la comprobación y el retiro de la copia. [Respaldo y restauración](docs/RESPALDO_Y_RESTAURACION.md).
+[![Explicar cuánto queda de una factura en Revenia](docs/images/recorrido/cobranza.webp)](docs/images/recorrido/cobranza.webp)
 
-## Consultas desde Codex
+**Registrar una gestión.** La ficha reúne responsable, última gestión y próxima acción. Registrar una llamada deja constancia del contacto que hizo la persona responsable.
 
-Abre la carpeta de Revenia en VS Code como proyecto de confianza. La extensión **Codex** lee `.codex/config.toml` y registra el servidor local **revenia** por entrada y salida estándar. En el panel de Codex, abre el engranaje y selecciona **MCP servers**. Si la ventana estaba abierta durante la instalación, inicia una conversación nueva o ejecuta **Developer: Reload Window** en la paleta de comandos. [Configuración MCP de Codex](https://developers.openai.com/codex/mcp/).
+[![Registrar una gestión en Revenia](docs/images/recorrido/seguimiento.webp)](docs/images/recorrido/seguimiento.webp)
 
-Necesitas Git, Windows PowerShell 5.1, Docker Desktop con Compose, la imagen local de `app` y las dependencias de `backend/composer.lock`. Laravel MCP 1.1.2 forma parte de la aplicación. Boost es una herramienta de desarrollo independiente. La conexión abre un contenedor temporal, sin puertos publicados. El catálogo de herramientas se puede descubrir antes de iniciar sesión. Para leer datos, PostgreSQL debe estar disponible y el esquema de cobranza debe estar aplicado por el operador.
+**Comprobar el avance del compromiso.** El compromiso se acordó por 120,00 PEN. La aplicación bancaria posterior acredita 100,00 PEN y quedan 20,00 PEN del acuerdo. Los 80,00 PEN de la factura corresponden a su saldo financiero.
 
-Desde la raíz, con el contexto local de Docker Desktop activo, ejecuta estos comandos cuando corresponda poner PostgreSQL en servicio. Conserva la pausa de escritura que hayas establecido para el respaldo.
+[![Comprobar el avance del compromiso en Revenia](docs/images/recorrido/compromiso.webp)](docs/images/recorrido/compromiso.webp)
+
+**Mi agenda.** El responsable encuentra los documentos asignados y la fecha prevista para volver a contactar al cliente.
+
+[![Mi agenda en Revenia](docs/images/recorrido/mi-agenda.webp)](docs/images/recorrido/mi-agenda.webp)
+
+**Agenda del equipo.** Dueño y contador pueden consultar el conjunto de la empresa, las tareas por atender y los documentos que requieren responsable.
+
+[![Agenda del equipo en Revenia](docs/images/recorrido/agenda-equipo.webp)](docs/images/recorrido/agenda-equipo.webp)
+
+</details>
+
+<a id="tesoreria-bancaria"></a>
+
+### Tesorería y distribución de abonos
+
+Siga la referencia **MUESTRA-001**. Tesorería registra un solo ingreso de 150,00 PEN. En las capturas se ve cuánto se aplicó, a qué documentos y qué importe volvió a quedar disponible tras una reversión.
+
+<details>
+<summary>Ver las 6 imágenes de tesorería y distribución de abonos</summary>
+
+**Identificar la cuenta receptora.** El dueño configura un alias, la institución y la moneda para clasificar los ingresos.
+
+[![Identificar la cuenta receptora en Revenia](docs/images/recorrido/cuentas-receptoras.webp)](docs/images/recorrido/cuentas-receptoras.webp)
+
+**Registrar el ingreso.** Indique cuenta, origen, medio, fecha efectiva, referencia e importe. El dueño contrasta el movimiento bancario antes de confirmarlo.
+
+[![Registrar el ingreso en Revenia](docs/images/recorrido/registrar-abono.webp)](docs/images/recorrido/registrar-abono.webp)
+
+**Localizar un abono.** La bandeja presenta el recibido, lo aplicado y el disponible de cada referencia. Los filtros permiten acotar por cliente, cuenta, moneda y situación.
+
+[![Localizar un abono en Revenia](docs/images/recorrido/bancos.webp)](docs/images/recorrido/bancos.webp)
+
+**Leer el detalle del abono.** MUESTRA-001 conserva 100,00 PEN aplicados y 50,00 PEN disponibles. **Distribuir abono** permite asignar parte del remanente.
+
+[![Leer el detalle del abono en Revenia](docs/images/recorrido/abono.webp)](docs/images/recorrido/abono.webp)
+
+**Distribuir entre comprobantes.** Sobre los 50,00 PEN disponibles se proponen 20,00 PEN para la factura. La pantalla permite revisar el remanente de 30,00 PEN antes de confirmar.
+
+[![Distribuir entre comprobantes en Revenia](docs/images/recorrido/distribucion.webp)](docs/images/recorrido/distribucion.webp)
+
+**Seguir una reversión.** El historial conserva las aplicaciones de 100,00 y 30,00 PEN. La segunda se revirtió y volvió al disponible del mismo abono.
+
+[![Seguir una reversión en Revenia](docs/images/recorrido/aplicaciones.webp)](docs/images/recorrido/aplicaciones.webp)
+
+</details>
+
+<a id="consulta-del-cliente"></a>
+
+### Estado de cuenta e impresión
+
+Seleccione **Clientes → Ver detalle → Estado de cuenta**, o acceda desde **Cuentas por cobrar**. El encabezado identifica empresa, cliente, moneda y hora de cálculo en Lima. El período limita los movimientos que aparecen en el historial.
+
+<details>
+<summary>Ver las 3 imágenes de estado de cuenta e impresión</summary>
+
+**Explicar la posición del cliente.** En la muestra conviven 80,00 PEN pendientes en un documento, 56,00 PEN de exceso en otro y 50,00 PEN disponibles en el banco. Cada cifra se presenta por separado.
+
+[![Explicar la posición del cliente en Revenia](docs/images/recorrido/estado-cuenta.webp)](docs/images/recorrido/estado-cuenta.webp)
+
+**Reconstruir los cambios.** El mismo abono aparece en ambas aplicaciones y en la reversión. La nota aceptada y la reserva anterior tienen filas distintas. Cada enlace permite volver al origen.
+
+[![Reconstruir los cambios en Revenia](docs/images/recorrido/movimientos.webp)](docs/images/recorrido/movimientos.webp)
+
+**Preparar el estado de cuenta para imprimir.** La vista imprimible completa reúne el encabezado, las cifras y el detalle del cliente seleccionado. El botón **Imprimir** abre el diálogo del navegador.
+
+[![Preparar el estado de cuenta para imprimir en Revenia](docs/images/recorrido/impresion.webp)](docs/images/recorrido/impresion.webp)
+
+</details>
+
+<a id="incidencias-y-conexiones"></a>
+
+### Incidencias e integraciones
+
+Abra una alerta de **Resumen** para investigar la operación en **Incidencias**. En el detalle del comprobante se consultan por separado la emisión, el cobro y la transferencia al ERP.
+
+<details>
+<summary>Ver las 4 imágenes de incidencias e integraciones</summary>
+
+**Encontrar una operación por atender.** La bandeja agrupa los intentos por operación y distingue el reintento automático de un fallo definitivo. Permite buscar por referencia.
+
+[![Encontrar una operación por atender en Revenia](docs/images/recorrido/incidencias.webp)](docs/images/recorrido/incidencias.webp)
+
+**Investigar un resultado.** La cronología de F001-00000006 indica que el simulador rechazó el documento. **Registrar revisión** deja evidencia de quién lo revisó y conserva el resultado de origen.
+
+[![Investigar un resultado en Revenia](docs/images/recorrido/cronologia.webp)](docs/images/recorrido/cronologia.webp)
+
+**Configurar la cobranza de clientes.** En **Configuración → Cobros** el dueño vincula al vendedor de pruebas de Mercado Pago. La captura muestra los campos vacíos y el aviso del entorno de prueba.
+
+[![Configurar la cobranza de clientes en Revenia](docs/images/recorrido/config-cobros.webp)](docs/images/recorrido/config-cobros.webp)
+
+**Configurar Odoo Community 18.** El dueño selecciona un destino autorizado y verifica la compañía y los permisos. La instalación de la captura tiene la integración desactivada. Al habilitarla, los comprobantes transferidos se crean en borrador contable.
+
+[![Configurar Odoo Community 18 en Revenia](docs/images/recorrido/integraciones.webp)](docs/images/recorrido/integraciones.webp)
+
+</details>
+
+<a id="empresa-y-cuenta"></a>
+
+### Administración de empresa y cuenta
+
+El dueño administra los datos de la empresa y los accesos. Cada usuario puede identificar su empresa y rol en **Mi cuenta**. Las cuotas y contrataciones de Revenia se consultan en **Plan y consumo**.
+
+<details>
+<summary>Ver las 5 imágenes de administración de empresa y cuenta</summary>
+
+**Mi empresa.** Revise la identidad comercial y los datos de contacto de la empresa de la sesión.
+
+[![Mi empresa en Revenia](docs/images/recorrido/empresa.webp)](docs/images/recorrido/empresa.webp)
+
+**Administrar usuarios.** El dueño puede gestionar los accesos y distingue en la lista los roles dueño, emisor y contador.
+
+[![Administrar usuarios en Revenia](docs/images/recorrido/usuarios.webp)](docs/images/recorrido/usuarios.webp)
+
+**Administrar la numeración.** Cada serie identifica tipo, estado y último correlativo reservado. El listado incluye series de facturas, boletas y notas de crédito.
+
+[![Administrar la numeración en Revenia](docs/images/recorrido/series.webp)](docs/images/recorrido/series.webp)
+
+**Plan y consumo.** La pantalla presenta el período contratado, las unidades consumidas y las disponibles. La conexión de pago de la plataforma tiene configuración propia.
+
+[![Plan y consumo en Revenia](docs/images/recorrido/plan.webp)](docs/images/recorrido/plan.webp)
+
+**Comprobar la sesión.** El perfil muestra empresa, correo y rol de la cuenta que está operando.
+
+[![Comprobar la sesión en Revenia](docs/images/recorrido/mi-cuenta.webp)](docs/images/recorrido/mi-cuenta.webp)
+
+</details>
+
+## Instalación local
+
+Desde una carpeta nueva se necesitan Git, Docker con Compose v2 o superior que admita `!reset` y `!override`, y PowerShell para los comandos siguientes. En Windows, utilice Docker Desktop en modo de contenedores Linux. PHP 8.4, Composer, Node, PostgreSQL 17, Redis y Mailpit se ejecutan en contenedores. Reserve los puertos locales 5173, 8000 y 8025.
 
 ```powershell
-docker compose up -d db
-.\scripts\codex\revenia.ps1 -Action Authorize
-```
-
-Introduce el correo y la contraseña en la terminal. El asistente crea una credencial Sanctum de lectura por usuario que vence a los 30 días. PostgreSQL conserva el resumen criptográfico de la credencial. Windows guarda el secreto cifrado con DPAPI bajo `%LOCALAPPDATA%\Revenia\Codex`, separado por usuario de Windows y copia del proyecto. Vuelve a conectar el servidor o abre una conversación nueva tras autorizar o renovar el acceso. Una autorización nueva invalida la anterior para esa cuenta de Revenia.
-
-| Herramienta | Consulta |
-| --- | --- |
-| `resumen_cobranza` | Suma y número de cobros aplicados entre `from` y `to` inclusive, junto al saldo de cartera vigente en el momento de la consulta. Devuelve moneda, período, instante de cálculo y zona `America/Lima`. Predetermina el mes actual y PEN. Para USD solicita otro resumen. |
-| `listar_comprobantes_pendientes` | Facturas y boletas aceptadas con saldo positivo. Admite `q` para cliente o número, `currency`, `due_from`, `due_to`, `situation`, `sort` y `page`. Usa los tramos de antigüedad de Cuentas por cobrar, páginas de 20 y enlaces internos al detalle. |
-| `consultar_comprobante` | Recibe el UUID `id` y devuelve identificación, estado de emisión simulada e importe original. Para ventas aceptadas incluye créditos, reservas, pagos, saldo y revisión. Si hay una transferencia a Odoo, devuelve su estado, fecha y referencia registrados en Revenia. |
-
-Los importes se expresan en céntimos de la moneda indicada. Los cobros pertenecen a clientes de la empresa. El dueño, emisor y contador activos consultan su propia empresa según la política de comprobantes. Cada llamada vuelve a validar el acceso y se ejecuta en una transacción PostgreSQL de solo lectura. El registro local `backend/storage/logs/mcp-AAAA-MM-DD.log` guarda el nombre de la herramienta, el resultado y la duración.
-
-Para revocar de inmediato las credenciales de Codex de tu cuenta, vuelve a identificarte desde la raíz. La siguiente consulta comprobará la revocación aunque la conversación siga abierta.
-
-```powershell
-.\scripts\codex\revenia.ps1 -Action Revoke
-```
-
-## Actualizar esta copia
-
-Desde la raíz, aplica las migraciones pendientes:
-
-```powershell
-docker compose exec -T app php artisan migrate
-docker compose restart worker scheduler
-```
-
-La migración `2026_11_20_000003_bind_payment_receivers.php` sigue a las de notas de crédito y vencimientos. La migración `2026_11_20_000004_add_incident_follow_up.php` añade el seguimiento de Incidencias, índices y fechas de errores de publicación. La migración `2026_11_20_000005_add_odoo_transfers.php` prepara la conexión, correspondencias, outbox e historial de Odoo. Las órdenes anteriores de Mercado Pago sin receptor comprobable quedan para revisión. El historial de pagos conserva sus importes.
-
-## Ejecución local
-
-Requisitos: **Docker con Compose** y PowerShell. Para E2E, Chrome y Node compatible (`^22.22.2`, `^24.15.0` o `>=26`). Las dependencias normales se instalan en contenedores.
-
-En una copia nueva, desde la raíz:
-
-```powershell
+git clone --branch release/cartera-rc2 https://github.com/fmarquezrojas-dev/revenia.git
+cd revenia
+# Una sola vez en el clon nuevo. Compose recordará su proyecto en esta carpeta.
+Set-Content -Path .env -Encoding ascii -Value ("COMPOSE_PROJECT_NAME=revenia-eval-" + [guid]::NewGuid().ToString("N").Substring(0,8))
 Copy-Item backend/.env.example backend/.env
 docker compose build
-docker compose up -d db redis mailpit
+docker compose up -d --wait db redis mailpit
 docker compose run --rm --no-deps -e COMPOSER_PROCESS_TIMEOUT=1200 app composer install --no-interaction --prefer-dist
 docker compose run --rm --no-deps app php artisan key:generate
 docker compose run --rm --no-deps frontend npm ci --ignore-scripts
@@ -193,46 +262,84 @@ docker compose run --rm --no-deps app php artisan migrate --force
 docker compose up -d
 ```
 
-No sobrescribas un `.env` existente ni regeneres su clave. **Reinicio:** `docker compose up -d`. Para actualizar, conserva la clave y los volúmenes y sigue la [guía de desarrollo](docs/development.md).
+Para explorar una **instalación nueva de demostración**, prepare el conjunto sintético con `docker compose exec -T app php scripts/prepare-demo.php`. Abra [Revenia local](http://localhost:5173) e ingrese con la cuenta de ejemplo del rol que quiera evaluar. Las credenciales públicas están en la [guía de datos locales](docs/DATOS_LOCALES.md). El correo de demostración llega a [Mailpit local](http://localhost:8025).
 
-| Servicio | URL local |
+Una instalación existente conserva su `.env`, su `APP_KEY` y sus volúmenes. Antes de actualizarla, haga un respaldo. En el clon nuevo, el `.env` de la raíz asigna un proyecto Compose propio y el de `backend` guarda la clave de Laravel. La instalación histórica utiliza el proyecto `facturly`. [Instalación y actualización](docs/development.md) · [Respaldo y restauración](docs/RESPALDO_Y_RESTAURACION.md)
+
+## Funciones por rol
+
+| Rol activo | Funciones dentro de su empresa |
 | --- | --- |
-| Interfaz | http://localhost:5173 |
-| API | http://localhost:8000 |
-| Mailpit | http://localhost:8025 |
+| Dueño | Configura empresa, usuarios, series, cuentas receptoras e integraciones. Emite, asigna responsables, confirma ingresos, distribuye abonos, revierte aplicaciones y autoriza la recuperación que admite cada proceso. |
+| Emisor | Prepara y emite comprobantes y notas. Consulta la cartera, registra abonos pendientes y gestiona los documentos que le asigna el dueño. Consulta **Mi agenda** y registra revisiones en **Incidencias**. |
+| Contador | Consulta comprobantes, cartera, compromisos, tesorería, incidencias y **Agenda del equipo**. Puede imprimir el estado de cuenta. |
 
-Para una instalación nueva con cuentas locales de ejemplo, el comando opcional es `docker compose exec -T app php scripts/prepare-demo.php`. Las instrucciones de acceso de ese conjunto están en la [guía de datos locales](docs/DATOS_LOCALES.md).
+El respaldo completo y la supervisión de Horizon corresponden al operador de plataforma. [Guía de operación y permisos](docs/guia-producto.md)
 
-La muestra opcional de devolución se prepara con `docker compose exec -T app php artisan demo:credit-note`. El comando requiere las cuentas de ejemplo y un periodo vigente. [Recorrido de la nota de crédito](docs/testing/test-report.md).
+## Consultas desde Codex y respaldo de plataforma
 
-La infraestructura conserva el identificador heredado `facturly` para bases, proyecto Compose, cookies y prefijos. Es intencional: renombrarlo crearía recursos distintos. No hace falta Mercado Pago para explorar catálogos, borradores, simulación, PDF, correo y dashboard.
+Estas dos funciones se utilizan desde herramientas del operador. El diagrama muestra por dónde entra cada solicitud y qué resultado se puede consultar.
+
+```mermaid
+flowchart TD
+    C["Codex en VS Code"] --> M["MCP local · identidad y permisos del usuario"]
+    M --> S["resumen_cobranza"]
+    M --> L["listar_comprobantes_pendientes"]
+    M --> D["consultar_comprobante"]
+    P["Operador de plataforma · PowerShell"] --> B["Respaldar base y archivos privados"]
+    B --> V["Validar manifiesto y sumas"]
+    V --> R["Restaurar en otro proyecto Compose"]
+    R --> I["Consultar informe de migraciones, relaciones y archivos"]
+```
+
+- **Consultas desde Codex.** Un responsable puede pedir el saldo de cartera en PEN, localizar comprobantes pendientes y consultar uno por su identificador. La credencial es revocable y delimita la lectura a la empresa autenticada. [Autorizar y revocar acceso](docs/guia-producto.md#consultas-desde-codex)
+- **Respaldo y restauración.** El operador custodia la `APP_KEY`, valida el paquete y compara la copia recuperada con el origen. La revisión se hace en una instancia aislada. El laboratorio cotejó ocho empresas, diez saldos y ocho referencias PDF. [Procedimiento de PowerShell](docs/RESPALDO_Y_RESTAURACION.md) · [Resultado del ensayo](docs/testing/test-report.md)
+
+<details>
+<summary>Ver el resultado de las consultas MCP y el visor de recuperación del laboratorio</summary>
+
+**Consultas MCP.** El registro del ensayo recoge las tres herramientas descubiertas, tres lecturas autenticadas, la respuesta indistinguible entre un documento ajeno y uno inexistente y la revocación. La imagen muestra el JSON del ensayo en el navegador. [Evidencia y huellas](docs/testing/rc11-evidence.json)
+
+[![Registro MCP con las tres herramientas y el resultado de las comprobaciones](docs/images/recorrido/mcp.webp)](docs/images/recorrido/mcp.webp)
+
+**Visor de recuperación.** El visor de Revenia presenta el informe conservado del ensayo aislado. Identifica por separado el paquete, PostgreSQL, los PDF y la comparación con el origen. La validación funcional corresponde al operador.
+
+[![Visor de Respaldo y restauración con los resultados del laboratorio](docs/images/recorrido/respaldo.webp)](docs/images/recorrido/respaldo.webp)
+
+</details>
 
 ## Arquitectura
 
-Laravel 13, PHP 8.4 y PostgreSQL 17 mantienen los comprobantes, pagos y contratos. React y TypeScript implementan la interfaz. Sanctum gestiona las sesiones por cookies. La API valida empresa y permisos, las claves compuestas protegen las relaciones entre registros y Redis con Horizon procesa la cola de emisión, PDF, correo y pagos.
-
-[Arquitectura](docs/architecture/overview.md) · [Decisiones técnicas](docs/architecture/decisions.md) · [API](docs/api/comprobantes.md) · [Índice de documentación](docs/README.md).
-
-## Capturas
-
-La galería conserva capturas de una versión anterior de **Resumen**, **Comprobantes** y **Plan y consumo**. La navegación y los textos actuales se describen arriba. [Galería histórica](docs/gallery.md).
-
-## Pruebas y calidad
-
-```powershell
-# Base de testing preparada según docs/testing/test-report.md
-powershell -NoProfile -File scripts/test-backend.ps1
-docker compose exec -T frontend npm test -- --maxWorkers=2
-docker compose exec -T frontend npm run lint
-docker compose exec -T frontend npm run build
-# Entorno completo aislado, requiere Chrome y puertos 8001/5174/8026 libres
-node scripts/run-integral-e2e.cjs
+```mermaid
+flowchart LR
+    UI["React y TypeScript"] --> API["Laravel y Sanctum"]
+    MCP["Codex · MCP local de lectura"] --> D["Servicios de dominio"]
+    API --> D
+    D --> PG[("PostgreSQL · cartera, auditoría y outbox")]
+    PG --> PUB["Publicador de operaciones pendientes"]
+    PUB --> Q["Redis"]
+    Q --> W["Trabajadores de Laravel"]
+    W --> PG
+    W --> PDF["PDF privado y Mailpit"]
+    W --> SIM["Emisión simulada"]
+    W -.-> MP["Mercado Pago sandbox"]
+    W -.-> ERP["Odoo Community 18 · borradores"]
 ```
 
-La base efectiva y el usuario se verifican antes de `RefreshDatabase`. Los scripts de concurrencia usan procesos PostgreSQL independientes. E2E comprueba navegador, Redis, interrupción del worker, PDF real y recepción SMTP en Mailpit; no sustituye una verificación externa de Mercado Pago.
+- **Empresa y permisos.** Laravel toma la empresa del usuario autenticado. Las políticas controlan la operación y las consultas delimitan filas, contadores y enlaces. Las claves compuestas de PostgreSQL protegen las relaciones. Un identificador de otra empresa devuelve la misma respuesta que uno inexistente. [Políticas](backend/app/Policies)
+- **Aplicación del dinero.** Una transacción bloquea los registros afectados y vuelve a leer el disponible y la deuda antes de distribuir. La identidad de la solicitud permite reconocer repeticiones. La cartera obtiene el dinero aplicado de la misma fuente que el estado de cuenta. [Tesorería](backend/app/Actions/Treasury) · [Cálculo del saldo](backend/app/Actions/Payments/DocumentBalances.php)
+- **Respuesta externa perdida.** El outbox conserva la intención aunque Redis falle. Si el proveedor pudo haber guardado la operación, el trabajador la consulta por su identidad estable. En Odoo una restricción única protege esa clave. Cuando falta confirmación, **Incidencias** conserva el intento para revisión. [Emisión](backend/app/Actions/Issuance) · [Transferencias a Odoo](backend/app/Actions/Odoo)
 
-[Resultados y alcance de las pruebas](docs/testing/test-report.md) · [Workflow](.github/workflows/ci.yml). No se publica cobertura no medida ni certificación de seguridad. El estado de CI debe consultarse en la ejecución real del repositorio.
+## Integraciones opcionales y evidencia
 
-## Autor y licencia
+| Componente | Alcance comprobado y requisitos adicionales |
+| --- | --- |
+| Mercado Pago | Se probaron avisos repetidos, separación del receptor de empresa y plataforma y recuperación del trabajador con un proveedor sintético. La prueba externa requiere credenciales de prueba y una URL de webhook autorizada. [Cobranza](docs/COBRANZA.md) |
+| Odoo Community 18.0 | Se comprobaron factura, boleta y rectificación en borrador contra una instalación real aislada con `revenia_bridge`. Cada operador configura su compañía y sus correspondencias. El conector viene desactivado. [Configuración de Odoo](docs/ODOO.md) |
+| Consultas desde Codex | Los tres contratos de lectura se descubrieron y se invocaron con autorización, denegación entre empresas y revocación. Para usarlos en VS Code se requieren la extensión Codex y una credencial local. [Consultas desde Codex](docs/guia-producto.md#consultas-desde-codex) |
 
-Proyecto de [fmarquezrojas-dev](https://github.com/fmarquezrojas-dev). Licencia [MIT](LICENSE), copyright 2026 fmarquezrojas-dev, para el código propio. Las dependencias y los recursos de terceros conservan sus titulares, avisos y licencias originales. El cambio de marca no acredita registro ni disponibilidad comercial del nombre.
+El bloque 11 pasó 407 pruebas de PHPUnit, 161 de frontend, carreras en PostgreSQL y un ensayo de restauración con 8 empresas, 10 saldos y 8 referencias PDF. El informe distingue los resultados del laboratorio de la aceptación con datos del operador. [Informe y alcance](docs/testing/test-report.md) · [Evidencia estructurada](docs/testing/rc11-evidence.json) · [CI en GitHub](https://github.com/fmarquezrojas-dev/revenia/actions/workflows/ci.yml)
+
+La edición documental **1.5** corresponde a la candidata de software **v0.1.0-rc.2**. [Cambios](CHANGELOG.md) · [Documentación técnica](docs/README.md) · [Licencia MIT](LICENSE)
+
+Proyecto de [fmarquezrojas-dev](https://github.com/fmarquezrojas-dev). El código propio se distribuye bajo la licencia MIT. Las dependencias conservan sus licencias.

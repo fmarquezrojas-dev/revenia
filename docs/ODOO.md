@@ -65,6 +65,10 @@ La clave de origen es `UUID_EMPRESA/UUID_COMPROBANTE`. El outbox crea una transf
 
 Desactivar la conexión detiene los nuevos envíos y pausa la cola. Una llamada ya recibida por Odoo puede concluir. Rotar la clave para la misma identidad conserva las referencias. Cambiar de compañía o base envía los pendientes a revisión y requiere habilitación explícita. Cuando consta que aún no pudo crearse un documento externo, el dueño puede **Autorizar nuevo destino** desde el comprobante, después de revisar ambos nombres. Si ya pudo existir un borrador, recupera primero la conexión original y comprueba su referencia. Una operación con resultado incierto queda protegida frente a la reasignación. El historial conserva las compañías e intentos anteriores. Habilitar una conexión no recorre comprobantes históricos.
 
+## Evidencia de la candidata
+
+En Odoo Community 18.0 con `revenia_bridge`, el laboratorio comprobó factura, boleta y nota en borrador y recuperó un documento ya creado tras perderse la respuesta. El operador valida sus propios permisos y mapeos. [Resultados del bloque 11](testing/test-report.md)
+
 ## Revisión funcional local
 
 Con datos que elijas, comprueba una factura y una boleta en borrador, una nota cuyo original siga pendiente, una boleta sin cliente identificado con su contacto genérico, un impuesto incorrecto y una respuesta perdida después de guardar. Coteja líneas, total, compañía y referencia en ambos sistemas. Al repetir una solicitud debe permanecer un único borrador por clave. Comprueba también la separación de dos empresas, una rotación de credenciales y la revisión explícita de pendientes al cambiar de destino. La configuración y las pruebas con Odoo quedan a cargo del operador local.

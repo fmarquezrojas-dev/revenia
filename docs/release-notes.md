@@ -1,21 +1,15 @@
-# Notas propuestas: v0.1.0-rc.1
+# Candidata v0.1.0-rc.2
 
-Candidata del alcance de portafolio; no es una release estable v1.0.0 ni un servicio desplegado.
+Revenia permite seguir la factura hasta el estado de cuenta. La candidata incorpora notas de crédito simuladas, cuentas por cobrar, responsables y compromisos, cobros bancarios con distribución y reversión, historial de incidencias, transferencia a Odoo en borrador, consultas MCP de lectura y respaldo aislado.
 
-## Alcance
+## Actualizar o evaluar
 
-API Laravel y SPA React multiempresa: sesion, roles, catalogos, series, borradores, importes exactos, emision simulada, outbox, PDF privado, correo Mailpit, cobranza test, planes/cuotas y dashboard responsive. Incluye pruebas de concurrencia y recuperacion, fixtures sinteticos y documentacion de arquitectura.
+- **Copia nueva.** Siga la [instalación](development.md) y prepare las cuentas sintéticas si va a explorar la interfaz.
+- **Instalación anterior.** Conserve la `APP_KEY` y prepare un [respaldo](RESPALDO_Y_RESTAURACION.md). Hay siete migraciones desde la base de 16. Compruebe `php artisan migrate:status` en su instalación antes de aplicar las pendientes.
+- **Documentación v1.5.** La ficha se distribuye en [Word editable](ficha/Revenia-v1.5.docx) y [PDF](ficha/Revenia-v1.5.pdf). Esta numeración identifica el documento.
 
-## Inicio
+El [README ilustrado](../README.md#guía-visual-por-tarea) permite seguir una factura y el mismo abono a través de sus pantallas.
 
-Docker Compose y PowerShell. Instalar desde lockfiles, generar APP_KEY solo en copia nueva, migrar y preparar dataset con `php scripts/prepare-demo.php`. [Instrucciones](development.md).
+## Evidencia y límites
 
-## Verificacion
-
-Consultar [informe](testing/test-report.md) y los runs de Actions del commit. No se anuncia cobertura no medida ni se confunde gateway falso con proveedor externo.
-
-## Limitaciones
-
-Sin SUNAT real, reglas tributarias simplificadas, sin clientes comerciales acreditados. Notas de credito no implementadas. Mercado Pago externo pendiente. Correo solo Mailpit. Una cuenta receptora sandbox compartida no es soporte comercial multicomercio. No hay renovacion automatica ni reembolsos automaticos.
-
-Esta nota se puede conservar como borrador hasta revisar el estado real de CI y las verificaciones externas. Publicar codigo no implica publicar una release estable.
+El bloque 11 comprobó saldos compartidos entre detalle, cartera y estado de cuenta, la concurrencia bancaria y de créditos, la recuperación del trabajador y restauración en otro clúster. Odoo Community 18 se comprobó en un laboratorio real. La validación externa de Mercado Pago y la aceptación en la compañía del operador siguen pendientes. La emisión fiscal es simulada. [Informe](testing/test-report.md) · [CI por revisión](https://github.com/fmarquezrojas-dev/revenia/actions/workflows/ci.yml)
