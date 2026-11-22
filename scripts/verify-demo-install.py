@@ -13,7 +13,8 @@ browser = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies
 
 
 def request(path, payload=None):
-    headers = {"Accept": "application/json", "Origin": ORIGIN, "Referer": ORIGIN + "/"}
+    headers = {"Accept": "text/html" if path == "/" else "application/json",
+               "Origin": ORIGIN, "Referer": ORIGIN + "/"}
     data = None
     if payload is not None:
         token = next(cookie.value for cookie in cookies if cookie.name == "XSRF-TOKEN")
