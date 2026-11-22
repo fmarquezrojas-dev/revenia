@@ -1,6 +1,10 @@
 .git
 **/node_modules
 **/vendor
+**/.codex
+**/.claude
+**/.agents
+**/AGENTS.md
 **/.env
 **/.env.*
 !**/.env.example

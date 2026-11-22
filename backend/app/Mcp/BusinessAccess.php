@@ -11,6 +11,7 @@ final class BusinessAccess
 {
     public const SCOPE = 'revenia:business:read';
 
+    // Persisted in Sanctum. Grant, rotation and revocation must select existing credentials.
     public const NAME = 'revenia-codex-local';
 
     public static function tokens(User $user): MorphMany

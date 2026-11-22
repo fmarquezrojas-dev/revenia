@@ -16,7 +16,7 @@ class BusinessAccessCommand extends Command
 {
     protected $signature = 'revenia:mcp-access {action : grant o revoke} {digest? : SHA-256 de la credencial generada en Windows}';
 
-    protected $description = 'Autoriza o revoca las consultas locales de Codex para el usuario autenticado';
+    protected $description = 'Autoriza o revoca las consultas locales de cobranza para el usuario autenticado';
 
     public function handle(): int
     {
@@ -25,7 +25,7 @@ class BusinessAccessCommand extends Command
         if (! app()->environment('local') || ! $this->input->isInteractive()
             || ! in_array($this->argument('action'), ['grant', 'revoke'], true)
             || ($grant && ! preg_match('/\A[a-f0-9]{64}\z/', (string) $digest))) {
-            $this->error('Ejecute el asistente local de autorización o revocación.');
+            $this->error('Ejecute el lanzador local en una terminal interactiva para autorizar o revocar el acceso.');
 
             return self::FAILURE;
         }
@@ -59,7 +59,7 @@ class BusinessAccessCommand extends Command
 
             return self::FAILURE;
         }
-        $this->info($grant ? 'Acceso de lectura autorizado durante 30 días.' : 'Acceso de Codex revocado para la cuenta.');
+        $this->info($grant ? 'Acceso de lectura autorizado durante 30 días.' : 'Acceso a las consultas locales revocado para la cuenta.');
 
         return self::SUCCESS;
     }
