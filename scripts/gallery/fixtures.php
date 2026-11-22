@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Delivery\GenerateDocumentPdf;
 use App\Actions\Documents\CreditNotes;
 use App\Actions\Issuance\ProcessEmission;
 use App\Actions\Issuance\RequestIssuance;
@@ -51,5 +52,7 @@ $note->refresh();
 if ($note->status === 'queued') {
     app(ProcessEmission::class)->handle($owner->company_id, $note->id, $note->version);
 }
+$pdf = DB::table('document_pdfs')->where('company_id', $owner->company_id)->where('document_id', $invoice->id)->firstOrFail();
+app(GenerateDocumentPdf::class)->handle($owner->company_id, $invoice->id, $pdf->version);
 echo json_encode(['invoice' => $invoice->id, 'customer' => $invoice->customer_id, 'note' => $note->id,
     'receipt' => $receipt, 'reject' => $get('rechazado-simulador')->id], JSON_THROW_ON_ERROR);

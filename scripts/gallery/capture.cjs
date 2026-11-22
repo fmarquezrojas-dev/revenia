@@ -22,13 +22,18 @@ async function main() {
   try {
     const page = await browser.newPage({ viewport: { width: 1400, height: 960 }, locale: 'es-PE', timezoneId: 'America/Lima' })
     const base = 'http://localhost:5173'
-    async function snap(name, route, target) {
+    async function snap(name, route, target, open) {
       await page.goto(base + route, { waitUntil: 'networkidle' })
       await page.locator('.user-menu').waitFor()
       await page.evaluate(() => document.fonts.ready)
+      if (open) await page.getByRole('button', { name: open, exact: true }).click()
       if (target) {
         const section = page.locator(target).first()
-        if (await section.count()) await section.evaluate(el => el.scrollIntoView({ block: 'start' }))
+        await section.waitFor({ state: 'visible' })
+        await section.evaluate(el => {
+          el.style.scrollMarginTop = '84px'
+          el.scrollIntoView({ block: 'start' })
+        })
       }
       const content = await page.locator('body').innerText()
       if (/No encontramos esta página|Acceso restringido|^Cargando/u.test(content)) throw new Error('Ruta no disponible: ' + route)
@@ -46,6 +51,8 @@ async function main() {
       ['resumen','/dashboard'],['comprobantes','/documents'],['borrador','/documents/new'],['factura',doc],
       ['pdf-correo',doc,'section[aria-label="PDF privado y correo"]'],['cobranza',doc,'section[aria-label*="obranza"]'],
       ['nota-credito','/documents/'+ids.note],['cartera','/receivables'],['seguimiento','/receivables/'+ids.invoice+'/followup'],
+      ['compromiso','/receivables/'+ids.invoice+'/followup','h3:has-text("Compromiso activo")'],
+      ['distribucion','/bank-receipts/'+ids.receipt,'h3:has-text("Distribuir entre comprobantes")','Distribuir abono'],
       ['mi-agenda','/receivables/agenda?scope=mine'],['agenda-equipo','/receivables/agenda?scope=team'],
       ['bancos','/bank-receipts'],['cuentas-receptoras','/bank-receipts/accounts'],['registrar-abono','/bank-receipts/new'],
       ['abono','/bank-receipts/'+ids.receipt],['aplicaciones','/bank-receipts/'+ids.receipt,'h3:has-text("Aplicaciones")'],
