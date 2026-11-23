@@ -2,7 +2,7 @@
 
 Revenia ayuda a equipos de facturación, cobranza y contabilidad a explicar **cuánto debe cada cliente hoy y qué movimientos explican ese saldo**. Una factura aceptada conserva su importe original. Desde ella se pueden seguir la nota de crédito, el abono bancario, su distribución y cualquier reversión hasta el estado de cuenta, en PEN o USD.
 
-[Recorrido de una venta](#recorrido-del-comprobante-al-estado-de-cuenta) · [Capturas por funcionalidad](#guía-visual-por-tarea) · [Instalar en local](#instalación-local) · [Ficha técnica en PDF](docs/ficha/Revenia-v1.5.pdf) · [Word editable](docs/ficha/Revenia-v1.5.docx)
+[Recorrido de una venta](#recorrido-del-comprobante-al-estado-de-cuenta) · [Capturas por funcionalidad](#guía-visual-por-tarea) · [Instalar en local](#instalación-local) · [Ficha técnica en PDF](docs/ficha/Revenia-v1.5.1.pdf) · [Word editable](docs/ficha/Revenia-v1.5.1.docx)
 
 [![Resumen de Revenia con las secciones Comprobantes, Cuentas por cobrar, Incidencias y Cobros bancarios y los indicadores de emisión del período](docs/images/recorrido/resumen.webp)](docs/images/recorrido/resumen.webp)
 
@@ -248,7 +248,7 @@ El dueño administra los datos de la empresa y los accesos. Cada usuario puede i
 Desde una carpeta nueva se necesitan Git, Docker con Compose v2 o superior que admita `!reset` y `!override`, y PowerShell para los comandos siguientes. En Windows, utilice Docker Desktop en modo de contenedores Linux. PHP 8.4, Composer, Node, PostgreSQL 17, Redis y Mailpit se ejecutan en contenedores. Reserve los puertos locales 5173, 8000 y 8025.
 
 ```powershell
-git clone --branch release/cartera-rc2 https://github.com/fmarquezrojas-dev/revenia.git
+git clone --branch main https://github.com/fmarquezrojas-dev/revenia.git
 cd revenia
 # Una sola vez en el clon nuevo. Compose recordará su proyecto en esta carpeta.
 Set-Content -Path .env -Encoding ascii -Value ("COMPOSE_PROJECT_NAME=revenia-eval-" + [guid]::NewGuid().ToString("N").Substring(0,8))
@@ -276,24 +276,29 @@ Una instalación existente conserva su `.env`, su `APP_KEY` y sus volúmenes. An
 
 El respaldo completo y la supervisión de Horizon corresponden al operador de plataforma. [Guía de operación y permisos](docs/guia-producto.md)
 
-## Consultas desde Codex y respaldo de plataforma
+## Consultas locales de cobranza
 
-Estas dos funciones se utilizan desde herramientas del operador. El diagrama muestra por dónde entra cada solicitud y qué resultado se puede consultar.
+El dueño, el emisor y el contador activos pueden consultar la cartera desde un cliente MCP de su elección. Cada consulta comprueba la credencial, la empresa y el permiso para ver comprobantes. La credencial de lectura vence a los 30 días y el usuario puede revocarla antes. [Configurar el cliente, autorizar y revocar](docs/guia-producto.md#consultas-locales-de-cobranza)
+
+| Pregunta | Operación |
+| --- | --- |
+| ¿Cuánto se cobró durante el período y cuánto queda por cobrar hoy en PEN o USD? | `resumen_cobranza` |
+| ¿Qué comprobantes aceptados tienen saldo pendiente y cuándo vencen? | `listar_comprobantes_pendientes` |
+| ¿Qué créditos y pagos explican el saldo de un comprobante? | `consultar_comprobante` |
+
+Las lecturas usan los mismos servicios de cartera que la interfaz y se ejecutan en una transacción PostgreSQL de solo lectura. El estado de Odoo procede de la última transferencia registrada en Revenia. El registro operativo guarda la herramienta, el resultado y la duración.
+
+## Respaldo y restauración
+
+El operador custodia la `APP_KEY`, valida el paquete y compara la copia recuperada con el origen. La revisión se hace en una instancia aislada. El laboratorio cotejó ocho empresas, diez saldos y ocho referencias PDF. [Procedimiento de PowerShell](docs/RESPALDO_Y_RESTAURACION.md) · [Resultado del ensayo](docs/testing/test-report.md)
 
 ```mermaid
-flowchart TD
-    C["Codex en VS Code"] --> M["MCP local · identidad y permisos del usuario"]
-    M --> S["resumen_cobranza"]
-    M --> L["listar_comprobantes_pendientes"]
-    M --> D["consultar_comprobante"]
-    P["Operador de plataforma · PowerShell"] --> B["Respaldar base y archivos privados"]
-    B --> V["Validar manifiesto y sumas"]
+flowchart LR
+    P["Operador de plataforma"] --> B["Respaldar PostgreSQL y archivos privados"]
+    B --> V["Comprobar manifiesto y sumas"]
     V --> R["Restaurar en otro proyecto Compose"]
-    R --> I["Consultar informe de migraciones, relaciones y archivos"]
+    R --> I["Revisar migraciones, relaciones y archivos"]
 ```
-
-- **Consultas desde Codex.** Un responsable puede pedir el saldo de cartera en PEN, localizar comprobantes pendientes y consultar uno por su identificador. La credencial es revocable y delimita la lectura a la empresa autenticada. [Autorizar y revocar acceso](docs/guia-producto.md#consultas-desde-codex)
-- **Respaldo y restauración.** El operador custodia la `APP_KEY`, valida el paquete y compara la copia recuperada con el origen. La revisión se hace en una instancia aislada. El laboratorio cotejó ocho empresas, diez saldos y ocho referencias PDF. [Procedimiento de PowerShell](docs/RESPALDO_Y_RESTAURACION.md) · [Resultado del ensayo](docs/testing/test-report.md)
 
 <details>
 <summary>Ver el resultado de las consultas MCP y el visor de recuperación del laboratorio</summary>
@@ -313,7 +318,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     UI["React y TypeScript"] --> API["Laravel y Sanctum"]
-    MCP["Codex · MCP local de lectura"] --> D["Servicios de dominio"]
+    MCP["Cliente MCP local de lectura"] --> D["Servicios de dominio"]
     API --> D
     D --> PG[("PostgreSQL · cartera, auditoría y outbox")]
     PG --> PUB["Publicador de operaciones pendientes"]
@@ -336,10 +341,10 @@ flowchart LR
 | --- | --- |
 | Mercado Pago | Se probaron avisos repetidos, separación del receptor de empresa y plataforma y recuperación del trabajador con un proveedor sintético. La prueba externa requiere credenciales de prueba y una URL de webhook autorizada. [Cobranza](docs/COBRANZA.md) |
 | Odoo Community 18.0 | Se comprobaron factura, boleta y rectificación en borrador contra una instalación real aislada con `revenia_bridge`. Cada operador configura su compañía y sus correspondencias. El conector viene desactivado. [Configuración de Odoo](docs/ODOO.md) |
-| Consultas desde Codex | Los tres contratos de lectura se descubrieron y se invocaron con autorización, denegación entre empresas y revocación. Para usarlos en VS Code se requieren la extensión Codex y una credencial local. [Consultas desde Codex](docs/guia-producto.md#consultas-desde-codex) |
+| Consultas locales de cobranza | El ensayo comprobó descubrimiento, lectura autorizada, aislamiento entre empresas y revocación. Requiere Windows, Docker Desktop y un cliente MCP con transporte estándar. [Configuración local](docs/guia-producto.md#consultas-locales-de-cobranza) |
 
-El bloque 11 pasó 407 pruebas de PHPUnit, 161 de frontend, carreras en PostgreSQL y un ensayo de restauración con 8 empresas, 10 saldos y 8 referencias PDF. El informe distingue los resultados del laboratorio de la aceptación con datos del operador. [Informe y alcance](docs/testing/test-report.md) · [Evidencia estructurada](docs/testing/rc11-evidence.json) · [CI en GitHub](https://github.com/fmarquezrojas-dev/revenia/actions/workflows/ci.yml)
+La candidata publicada pasó 407 pruebas de PHPUnit, 161 de frontend, carreras en PostgreSQL y un ensayo de restauración con 8 empresas, 10 saldos y 8 referencias PDF. El informe distingue los resultados del laboratorio de la aceptación con datos del operador. [Informe y alcance](docs/testing/test-report.md) · [Evidencia estructurada](docs/testing/rc11-evidence.json) · [CI en GitHub](https://github.com/fmarquezrojas-dev/revenia/actions/workflows/ci.yml)
 
-La edición documental **1.5** corresponde a la candidata de software **v0.1.0-rc.2**. [Cambios](CHANGELOG.md) · [Documentación técnica](docs/README.md) · [Licencia MIT](LICENSE)
+La ficha técnica **1.5.1** documenta la candidata de software **v0.1.0-rc.2** y la actualización del lanzador local. El tag conserva la edición documental 1.5. [Cambios](CHANGELOG.md) · [Documentación técnica](docs/README.md) · [Licencia MIT](LICENSE)
 
 Proyecto de [fmarquezrojas-dev](https://github.com/fmarquezrojas-dev). El código propio se distribuye bajo la licencia MIT. Las dependencias conservan sus licencias.

@@ -10,6 +10,7 @@ function Get-Digest([string]$Value) {
     return [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
 }
 
+# Keep the original DPAPI profile path so existing credentials survive launcher upgrades.
 # DPAPI binds the encrypted credential to this Windows account. Separate worktrees have separate files.
 $profilePath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Revenia\Codex'
 $credentialPath = Join-Path $profilePath ((Get-Digest $root.ToLowerInvariant()) + '.dpapi')

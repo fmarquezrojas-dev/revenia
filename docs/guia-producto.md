@@ -138,20 +138,42 @@ El conector crea únicamente borradores. La contabilización, el inventario y la
 
 Antes de aplicar migraciones, el operador puede copiar PostgreSQL y los archivos privados y abrir una revisión aislada en Windows. La guía incluye la pausa de escritura, la custodia de la clave, la comprobación y el retiro de la copia. [Respaldo y restauración](RESPALDO_Y_RESTAURACION.md).
 
-## Consultas desde Codex
+## Consultas locales de cobranza
 
-Abre la carpeta de Revenia en VS Code como proyecto de confianza. La extensión **Codex** lee `.codex/config.toml` y registra el servidor local **revenia** por entrada y salida estándar. En el panel de Codex, abre el engranaje y selecciona **MCP servers**. Si la ventana estaba abierta durante la instalación, inicia una conversación nueva o ejecuta **Developer: Reload Window** en la paleta de comandos. [Configuración MCP de Codex](https://developers.openai.com/codex/mcp/).
+Un cliente compatible con Model Context Protocol (MCP) puede consultar la cartera por entrada y salida estándar (`stdio`). El dueño, emisor o contador necesita una cuenta activa con permiso para consultar comprobantes de su empresa.
 
-Necesitas Git, Windows PowerShell 5.1, Docker Desktop con Compose, la imagen local de `app` y las dependencias de `backend/composer.lock`. Laravel MCP 1.1.2 forma parte de la aplicación. Boost es una herramienta de desarrollo independiente. La conexión abre un contenedor temporal, sin puertos publicados. El catálogo de herramientas se puede descubrir antes de iniciar sesión. Para leer datos, PostgreSQL debe estar disponible y el esquema de cobranza debe estar aplicado por el operador.
+### Preparar la conexión en Windows
 
-Desde la raíz, con el contexto local de Docker Desktop activo, ejecuta estos comandos cuando corresponda poner PostgreSQL en servicio. Conserva la pausa de escritura que hayas establecido para el respaldo.
+Instale Revenia desde la rama actual siguiendo la [guía de desarrollo](development.md). Se requieren Windows PowerShell 5.1, el contexto local de Docker Desktop, la imagen de `app` y las dependencias de `backend/composer.lock`. Para leer saldos, PostgreSQL debe estar disponible con las migraciones de cartera aplicadas.
 
-```powershell
-docker compose up -d db
-.\scripts\codex\revenia.ps1 -Action Authorize
-```
+1. En PowerShell, desde la raíz de la copia que desea consultar, obtenga las dos rutas.
 
-Introduce el correo y la contraseña en la terminal. El asistente crea una credencial Sanctum de lectura por usuario que vence a los 30 días. PostgreSQL conserva el resumen criptográfico de la credencial. Windows guarda el secreto cifrado con DPAPI bajo `%LOCALAPPDATA%\Revenia\Codex`, separado por usuario de Windows y copia del proyecto. Vuelve a conectar el servidor o abre una conversación nueva tras autorizar o renovar el acceso. Una autorización nueva invalida la anterior para esa cuenta de Revenia.
+   ```powershell
+   $ejecutable = (Get-Command powershell.exe -CommandType Application).Source
+   $lanzador = (Resolve-Path -LiteralPath '.\scripts\mcp\revenia.ps1').Path
+   $ejecutable
+   $lanzador
+   ```
+
+2. En la configuración **personal** de su cliente, registre un servidor llamado `revenia` con transporte `stdio`. En el campo de ejecutable use el valor de `$ejecutable`. Pase cada argumento por separado, en este orden. El último argumento es la ruta completa del archivo, incluso si contiene espacios.
+
+   ```powershell
+   $argumentos = @('-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File', $lanzador)
+   [pscustomobject]@{ command = $ejecutable; args = $argumentos } | ConvertTo-Json
+   ```
+
+   El comando imprime valores de configuración para copiar al formato que admita el cliente. El lanzador localiza Compose a partir de su propia ruta y abre un contenedor temporal sin publicar puertos. La configuración personal solo necesita el ejecutable y los argumentos.
+
+3. Desde una terminal interactiva, inicie la base de esa instalación cuando corresponda y autorice el acceso. Si su instalación está en una pausa de escritura por respaldo, termine el respaldo antes de autorizar.
+
+   ```powershell
+   docker compose up -d db
+   .\scripts\mcp\revenia.ps1 -Action Authorize
+   ```
+
+   Introduzca su correo y contraseña de Revenia. La autorización dura 30 días. Sanctum guarda la huella de la credencial y Windows protege el secreto con DPAPI para el usuario y la copia del proyecto. Una autorización nueva sustituye a la anterior. Si ya tenía una credencial vigente en esta misma copia y cuenta de Windows, actualice la ruta del lanzador en el cliente. La credencial conserva su vencimiento.
+
+4. Conecte o reinicie el servidor en su cliente y consulte su catálogo de herramientas (`tools/list`). El catálogo es público en el transporte local. Leer datos requiere autorización.
 
 | Herramienta | Consulta |
 | --- | --- |
@@ -161,8 +183,8 @@ Introduce el correo y la contraseña en la terminal. El asistente crea una crede
 
 Los importes se expresan en céntimos de la moneda indicada. Los cobros pertenecen a clientes de la empresa. El dueño, emisor y contador activos consultan su propia empresa según la política de comprobantes. Cada llamada vuelve a validar el acceso y se ejecuta en una transacción PostgreSQL de solo lectura. El registro local `backend/storage/logs/mcp-AAAA-MM-DD.log` guarda el nombre de la herramienta, el resultado y la duración.
 
-Para revocar de inmediato las credenciales de Codex de tu cuenta, vuelve a identificarte desde la raíz. La siguiente consulta comprobará la revocación aunque la conversación siga abierta.
+Para revocar el acceso, ejecute el siguiente comando desde la raíz y vuelva a identificarse. La siguiente consulta comprobará la revocación incluso si el cliente continúa conectado.
 
 ```powershell
-.\scripts\codex\revenia.ps1 -Action Revoke
+.\scripts\mcp\revenia.ps1 -Action Revoke
 ```

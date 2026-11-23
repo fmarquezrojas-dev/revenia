@@ -123,6 +123,29 @@ class BusinessMcpTest extends TestCase
         }
     }
 
+    public function test_previously_issued_credential_is_readable_and_revocable(): void
+    {
+        $user = User::factory()->create(['role' => 'accountant', 'password' => 'synthetic-password']);
+        $secret = 'rv_mcp_'.bin2hex(random_bytes(32));
+        DB::table('personal_access_tokens')->insert([
+            'tokenable_type' => $user->getMorphClass(), 'tokenable_id' => $user->id,
+            'name' => 'revenia-codex-local', 'token' => hash('sha256', $secret),
+            'abilities' => json_encode(['revenia:business:read', 'company:'.$user->company_id], JSON_THROW_ON_ERROR),
+            'expires_at' => now()->addDay(),
+        ]);
+        putenv('REVENIA_MCP_TOKEN='.$secret);
+        BusinessServer::tool(ResumenCobranza::class)->assertOk();
+        app()->detectEnvironment(fn () => 'local');
+        try {
+            $this->artisan('revenia:mcp-access', ['action' => 'revoke'])
+                ->expectsQuestion('Correo de su cuenta Revenia', $user->email)
+                ->expectsQuestion('Contraseña de Revenia', 'synthetic-password')->assertSuccessful();
+            BusinessServer::tool(ResumenCobranza::class)->assertHasErrors(['Acceso denegado.']);
+        } finally {
+            app()->detectEnvironment(fn () => 'testing');
+        }
+    }
+
     private function sale(User $user, string $currency, int $amount): Document
     {
         $doc = Document::factory()->create(['company_id' => $user->company_id, 'created_by' => $user->id, 'currency' => $currency,

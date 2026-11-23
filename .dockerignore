@@ -1,6 +1,12 @@
 .git
 **/node_modules
 **/vendor
+**/.codex
+**/.claude
+**/.agents
+**/AGENTS.md
+**/CLAUDE.md
+**/boost.json
 **/.env
 **/.env.*
 !**/.env.example

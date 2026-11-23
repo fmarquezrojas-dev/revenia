@@ -16,9 +16,6 @@
 **/.idea/
 **/.vscode/
 **/.codex/
-!/.codex/
-/.codex/*
-!/.codex/config.toml
 **/.claude/
 **/.agents/
 **/AGENTS.md
@@ -39,7 +36,7 @@ revenia-restore-????????????/
 **/*.pem
 **/*.key
 **/*.docx
-!docs/ficha/Revenia-v1.5.docx
+!docs/ficha/Revenia-v1.5.1.docx
 **/*.doc
 backend/storage/**
 !backend/storage/**/

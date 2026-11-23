@@ -6,7 +6,7 @@ Revenia permite seguir la factura hasta el estado de cuenta. La candidata incorp
 
 - **Copia nueva.** Siga la [instalación](development.md) y prepare las cuentas sintéticas si va a explorar la interfaz.
 - **Instalación anterior.** Conserve la `APP_KEY` y prepare un [respaldo](RESPALDO_Y_RESTAURACION.md). Hay siete migraciones desde la base de 16. Compruebe `php artisan migrate:status` en su instalación antes de aplicar las pendientes.
-- **Documentación v1.5.** La ficha se distribuye en [Word editable](ficha/Revenia-v1.5.docx) y [PDF](ficha/Revenia-v1.5.pdf). Esta numeración identifica el documento.
+- **Documentación 1.5.1.** [Word editable](ficha/Revenia-v1.5.1.docx) y [PDF](ficha/Revenia-v1.5.1.pdf). La actualización documenta las consultas de cobranza y el lanzador de la rama actual. La [publicación original](https://github.com/fmarquezrojas-dev/revenia/releases/tag/v0.1.0-rc.2) conserva el tag y sus archivos 1.5.
 
 El [README ilustrado](../README.md#guía-visual-por-tarea) permite seguir una factura y el mismo abono a través de sus pantallas.
 
